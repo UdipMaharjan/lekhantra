@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://YOUR-BACKEND-NAME.onrender.com";
+const API_BASE_URL = "https://lekhantra-backend.onrender.com";
 
 let currentTextFile = null;
 
