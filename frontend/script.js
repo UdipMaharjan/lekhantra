@@ -40,6 +40,19 @@ function formatOutput(data) {
   return JSON.stringify(data, null, 2);
 }
 
+function getErrorMessage(data) {
+  if (data.detail && data.detail.message) {
+    return data.detail.message;
+  }
+
+  if (data.message) {
+    return data.message;
+  }
+
+  return "Something went wrong.";
+}
+
+
 async function uploadPDF() {
   const file = pdfInput.files[0];
 
@@ -61,6 +74,12 @@ async function uploadPDF() {
     });
 
     const data = await response.json();
+
+    if (!response.ok) {
+    uploadStatus.textContent = getErrorMessage(data);
+    setOutput(JSON.stringify(data, null, 2));
+    return;
+    }
 
     if (data.status === "success") {
       currentTextFile = data.text_file;
@@ -92,7 +111,12 @@ async function generateViva() {
     return;
   }
 
-  const count = Number(document.getElementById("questionCount").value) || 5;
+let count = Number(document.getElementById("questionCount").value) || 5;
+
+if (count < 1 || count > 10) {
+  setOutput("Please enter a number of questions between 1 and 10.");
+  return;
+}
 
   setLoading("Generating viva questions with Lekhantra...");
 
@@ -123,7 +147,12 @@ async function generateExam() {
     return;
   }
 
-  const count = Number(document.getElementById("questionCount").value) || 5;
+let count = Number(document.getElementById("questionCount").value) || 5;
+
+if (count < 1 || count > 10) {
+  setOutput("Please enter a number of questions between 1 and 10.");
+  return;
+}
 
   setLoading("Generating exam questions with Lekhantra...");
 

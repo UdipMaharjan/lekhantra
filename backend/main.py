@@ -1,11 +1,15 @@
 import os
 import shutil
-from fastapi import FastAPI, UploadFile, File
-from pydantic import BaseModel
+import uuid
+from pathlib import Path
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from pydantic import BaseModel, Field
 from question_utils import generate_viva_questions, generate_exam_questions
 from pdf_utils import extract_text_from_pdf
 from ai_utils import generate_ai_response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 
 app = FastAPI(
@@ -21,8 +25,37 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    for error in exc.errors():
+        field = error.get("loc", ["unknown"])[-1]
+        error_type = error.get("type")
+
+        if field == "number_of_questions":
+            return JSONResponse(
+                status_code=422,
+                content={
+                    "status": "error",
+                    "message": f"Number of questions must be between 1 and {MAX_QUESTIONS}."
+                }
+            )
+
+    return JSONResponse(
+        status_code=422,
+        content={
+            "status": "error",
+            "message": "Invalid input. Please check your request data.",
+            "details": exc.errors()
+        }
+    )
+
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+MAX_PDF_SIZE_MB = 5
+MAX_PDF_SIZE_BYTES = MAX_PDF_SIZE_MB * 1024 * 1024
+
+MAX_QUESTIONS = 10
+MAX_AI_TEXT_CHARS = 3000
 
 
 class ChatRequest(BaseModel):
@@ -33,11 +66,40 @@ class QuestionRequest(BaseModel):
 
 class AIQuestionRequest(BaseModel):
     text_file: str
-    number_of_questions: int = 5    
+    number_of_questions: int = Field(default=5, ge=1, le=MAX_QUESTIONS)
 
 class AskPDFRequest(BaseModel):
     text_file: str
-    question: str    
+    question: str   
+
+def create_error_response(message: str, details: str | None = None):
+    response = {
+        "status": "error",
+        "message": message
+    }
+
+    if details:
+        response["details"] = details
+
+    return response
+
+
+def get_safe_pdf_filename(original_filename: str) -> str:
+    file_extension = Path(original_filename).suffix.lower()
+
+    if file_extension != ".pdf":
+        raise HTTPException(
+            status_code=400,
+            detail=create_error_response("Only PDF files are allowed.")
+        )
+
+    safe_name = f"{uuid.uuid4().hex}.pdf"
+    return safe_name
+
+
+def get_text_path(text_file: str) -> str:
+    safe_name = Path(text_file).name
+    return os.path.join(UPLOAD_DIR, safe_name)     
 
 @app.get("/")
 def home():
@@ -70,21 +132,41 @@ def chat(request: ChatRequest):
 
 
 @app.post("/upload-pdf")
-def upload_pdf(file: UploadFile = File(...)):
-    if not file.filename.endswith(".pdf"):
-        return {
-            "status": "error",
-            "message": "Only PDF files are allowed."
-        }
+async def upload_pdf(file: UploadFile = File(...)):
+    if not file.filename:
+        raise HTTPException(
+            status_code=400,
+            detail=create_error_response("No file was uploaded.")
+        )
 
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
+    safe_pdf_filename = get_safe_pdf_filename(file.filename)
+    file_path = os.path.join(UPLOAD_DIR, safe_pdf_filename)
+
+    file_content = await file.read()
+
+    if len(file_content) > MAX_PDF_SIZE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=create_error_response(
+                f"PDF is too large. Maximum allowed size is {MAX_PDF_SIZE_MB} MB."
+            )
+        )
 
     with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        buffer.write(file_content)
 
     extracted_text = extract_text_from_pdf(file_path)
 
-    text_filename = file.filename.replace(".pdf", ".txt")
+    if not extracted_text or extracted_text.startswith("Error reading PDF"):
+        raise HTTPException(
+            status_code=400,
+            detail=create_error_response(
+                "Could not extract text from this PDF.",
+                "The PDF may be scanned, image-based, encrypted, or corrupted."
+            )
+        )
+
+    text_filename = safe_pdf_filename.replace(".pdf", ".txt")
     text_path = os.path.join(UPLOAD_DIR, text_filename)
 
     with open(text_path, "w", encoding="utf-8") as text_file:
@@ -92,16 +174,19 @@ def upload_pdf(file: UploadFile = File(...)):
 
     return {
         "status": "success",
-        "filename": file.filename,
+        "original_filename": file.filename,
+        "saved_pdf": safe_pdf_filename,
         "text_file": text_filename,
         "message": "PDF uploaded and text extracted successfully.",
         "text_preview": extracted_text[:1000],
-        "total_characters": len(extracted_text)
+        "total_characters": len(extracted_text),
+        "file_size_mb": round(len(file_content) / (1024 * 1024), 2)
     }
+
 
 @app.post("/generate-viva")
 def generate_viva(request: QuestionRequest):
-    text_path = os.path.join(UPLOAD_DIR, request.text_file)
+    text_path = get_text_path(request.text_file)
 
     if not os.path.exists(text_path):
         return {
@@ -124,7 +209,7 @@ def generate_viva(request: QuestionRequest):
 
 @app.post("/generate-exam")
 def generate_exam(request: QuestionRequest):
-    text_path = os.path.join(UPLOAD_DIR, request.text_file)
+    text_path = get_text_path(request.text_file)
 
     if not os.path.exists(text_path):
         return {
@@ -146,7 +231,7 @@ def generate_exam(request: QuestionRequest):
 
 @app.post("/ai-generate-viva")
 def ai_generate_viva(request: AIQuestionRequest):
-    text_path = os.path.join(UPLOAD_DIR, request.text_file)
+    text_path = get_text_path(request.text_file)
 
     if not os.path.exists(text_path):
         return {
@@ -169,7 +254,7 @@ Rules:
 - Format the output as numbered Q&A.
 
 Study notes:
-{text[:3000]}
+{text[:MAX_AI_TEXT_CHARS]}
 """
 
     ai_output = generate_ai_response(prompt)
@@ -183,7 +268,7 @@ Study notes:
 
 @app.post("/ai-generate-exam")
 def ai_generate_exam(request: AIQuestionRequest):
-    text_path = os.path.join(UPLOAD_DIR, request.text_file)
+    text_path = get_text_path(request.text_file)
 
     if not os.path.exists(text_path):
         return {
@@ -207,7 +292,7 @@ Rules:
 - Format output clearly.
 
 Study notes:
-{text[:3000]}
+{text[:MAX_AI_TEXT_CHARS]}
 """
 
     ai_output = generate_ai_response(prompt)
@@ -221,7 +306,7 @@ Study notes:
 
 @app.post("/ask-pdf")
 def ask_pdf(request: AskPDFRequest):
-    text_path = os.path.join(UPLOAD_DIR, request.text_file)
+    text_path = get_text_path(request.text_file)
 
     if not os.path.exists(text_path):
         return {
@@ -243,7 +328,7 @@ Rules:
 - Keep the answer simple and student-friendly.
 
 PDF notes:
-{text[:3000]}
+{text[:MAX_AI_TEXT_CHARS]}
 
 User question:
 {request.question}
