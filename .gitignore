@@ -1,0 +1,26 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+backend/.venv/
+backend/venv/
+.venv/
+venv/
+
+# Environment variables
+backend/.env
+.env
+
+# Uploaded user files
+backend/uploads/
+uploads/
+
+# Editor / OS
+.vscode/
+.DS_Store
+
+# Logs
+*.log

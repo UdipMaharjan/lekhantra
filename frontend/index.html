@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Lekhantra | AI Study Assistant</title>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <nav class="navbar">
+      <div class="brand">
+        <div class="brand-mark">ल</div>
+        <div>
+          <h1>Lekhantra</h1>
+          <p>AI Study Assistant</p>
+        </div>
+      </div>
+
+      <div class="nav-pill">
+        PDF • Exams • Viva
+      </div>
+    </nav>
+
+    <main class="hero-grid">
+      <section class="hero-card">
+        <div class="eyebrow">Made for focused preparation</div>
+
+        <h2>Turn your notes into answers, quizzes, and viva prep.</h2>
+
+        <p class="hero-text">
+          Upload a PDF, ask questions from it, and generate exam or viva-style questions instantly.
+          Lekhantra helps you revise smarter from your own study materials.
+        </p>
+
+        <div class="hero-actions">
+          <a href="#workspace" class="primary-btn">Start preparing</a>
+          <span class="soft-note">Powered by FastAPI + AI</span>
+        </div>
+      </section>
+
+      <section class="pattern-card">
+        <div class="mandala"></div>
+        <h3>Study with clarity</h3>
+        <p>
+          Inspired by Nepali warmth, built with a clean modern interface.
+        </p>
+      </section>
+    </main>
+
+    <section id="workspace" class="workspace">
+      <div class="section-heading">
+        <p>Workspace</p>
+        <h2>Your PDF study desk</h2>
+      </div>
+
+      <div class="app-grid">
+        <section class="panel upload-panel">
+          <div class="panel-header">
+            <span class="step-badge">1</span>
+            <div>
+              <h3>Upload PDF</h3>
+              <p>Add your notes, slides, CV, or study material.</p>
+            </div>
+          </div>
+
+          <label class="upload-box" for="pdfInput">
+            <input type="file" id="pdfInput" accept="application/pdf" />
+            <span class="upload-icon">📄</span>
+            <strong>Choose a PDF file</strong>
+            <small id="fileName">No file selected</small>
+          </label>
+
+          <button class="primary-btn full" onclick="uploadPDF()">Upload and Extract</button>
+
+          <div class="status-box" id="uploadStatus">
+            Waiting for PDF upload.
+          </div>
+        </section>
+
+        <section class="panel action-panel">
+          <div class="panel-header">
+            <span class="step-badge">2</span>
+            <div>
+              <h3>Generate Prep</h3>
+              <p>Create AI-powered exam and viva material.</p>
+            </div>
+          </div>
+
+          <div class="input-row">
+            <label for="questionCount">Number of questions</label>
+            <input type="number" id="questionCount" min="1" max="15" value="5" />
+          </div>
+
+          <div class="button-stack">
+            <button onclick="generateViva()">Generate Viva Q&A</button>
+            <button onclick="generateExam()">Generate Exam Questions</button>
+          </div>
+
+          <div class="ask-box">
+            <label for="pdfQuestion">Ask from PDF</label>
+            <textarea id="pdfQuestion" placeholder="Example: What are the main points in this PDF?"></textarea>
+            <button onclick="askPDF()">Ask Lekhantra</button>
+          </div>
+        </section>
+      </div>
+
+      <section class="result-panel">
+        <div class="result-header">
+          <div>
+            <p>Output</p>
+            <h3>Lekhantra Response</h3>
+          </div>
+
+          <div class="result-actions">
+        <button class="ghost-btn" onclick="copyOutput()">Copy</button>
+        <button class="ghost-btn" onclick="downloadOutput()">Download</button>
+        <button class="ghost-btn" onclick="clearOutput()">Clear</button>
+        </div>
+        </div>
+
+        <pre id="outputBox">Your generated answers will appear here.</pre>
+      </section>
+    </section>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
