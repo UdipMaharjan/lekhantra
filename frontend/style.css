@@ -461,12 +461,11 @@ pre {
 .toast {
   position: fixed !important;
   left: 50% !important;
-  bottom: 32px !important;
+  bottom: 28px !important;
   z-index: 99999 !important;
 
-  min-width: 280px;
-  max-width: 440px;
-  padding: 16px 22px;
+  width: min(420px, calc(100vw - 32px));
+  padding: 15px 18px;
 
   border-radius: 18px;
   background: rgba(55, 18, 23, 0.96);
@@ -474,6 +473,7 @@ pre {
 
   font-size: 14px;
   font-weight: 800;
+  line-height: 1.45;
   text-align: center;
 
   box-shadow: 0 20px 60px rgba(55, 18, 23, 0.35);
@@ -496,6 +496,25 @@ pre {
 
 .toast.error {
   background: linear-gradient(145deg, #8b2f2f, #5e1f1f);
+}
+
+@media (max-width: 600px) {
+  .toast {
+    left: 16px !important;
+    right: 16px !important;
+    bottom: 18px !important;
+    width: auto;
+    max-width: none;
+
+    transform: translateY(24px) scale(0.98);
+    border-radius: 16px;
+    padding: 14px 16px;
+    font-size: 13px;
+  }
+
+  .toast.show {
+    transform: translateY(0) scale(1);
+  }
 }
 
 .feature-strip {
