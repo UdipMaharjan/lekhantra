@@ -608,13 +608,6 @@ pre.loading::before {
     grid-template-columns: 1fr;
     margin-top: -30px;
   }
-
-  .toast {
-    left: 18px;
-    right: 18px;
-    top: 18px;
-    max-width: none;
-  }
 }
 @media (max-width: 850px) {
   .hero-grid,
