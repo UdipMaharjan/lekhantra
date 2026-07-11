@@ -1,5 +1,7 @@
 # Lekhantra
 
+Live Website: https://lekhantra.onrender.com
+
 Lekhantra is an AI-powered study assistant that helps students upload PDFs, ask questions from their notes, and generate exam or viva preparation material instantly.
 
 ## Features
@@ -46,3 +48,7 @@ lekhantra/
 │
 ├── .gitignore
 └── README.md
+
+
+
+
