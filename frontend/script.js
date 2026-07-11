@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://your-backend-name.onrender.com";
+const API_BASE_URL = "http://127.0.0.1:8000";
 
 let currentTextFile = null;
 
@@ -8,6 +8,10 @@ const uploadStatus = document.getElementById("uploadStatus");
 const outputBox = document.getElementById("outputBox");
 const dropZone = document.getElementById("dropZone");
 const toast = document.getElementById("toast");
+const accessGate = document.getElementById("accessGate");
+const appShell = document.getElementById("appShell");
+const accessCodeInput = document.getElementById("accessCodeInput");
+const accessMessage = document.getElementById("accessMessage");
 
 pdfInput.addEventListener("change", () => {
   if (pdfInput.files.length > 0) {
@@ -48,6 +52,65 @@ dropZone.addEventListener("drop", (event) => {
   fileName.textContent = droppedFile.name;
   showToast("PDF selected successfully.");
 });
+function unlockApp() {
+  accessGate.classList.add("hidden");
+  appShell.classList.remove("locked");
+}
+
+function checkExistingAccess() {
+  const hasAccess = sessionStorage.getItem("lekhantra_access") === "granted";
+
+  if (hasAccess) {
+    unlockApp();
+  }
+}
+
+async function verifyAccess() {
+  const accessCode = accessCodeInput.value.trim();
+
+  if (!accessCode) {
+    accessMessage.textContent = "Please enter the access code.";
+    return;
+  }
+
+  accessMessage.textContent = "Checking access...";
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/verify-access`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        access_code: accessCode
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      accessMessage.textContent = getErrorMessage(data);
+      showToast("Invalid access code.", "error");
+      return;
+    }
+
+    sessionStorage.setItem("lekhantra_access", "granted");
+    accessMessage.textContent = "";
+    unlockApp();
+    showToast("Access granted.");
+  } catch (error) {
+    accessMessage.textContent = "Could not connect to server.";
+    showToast("Could not connect to server.", "error");
+  }
+}
+
+accessCodeInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    verifyAccess();
+  }
+});
+
+checkExistingAccess();
 
 function setOutput(content) {
   outputBox.textContent = content;
