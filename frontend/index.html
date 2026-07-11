@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+ <div id="toast" class="toast">Notification</div> 
   <div class="page-shell">
     <nav class="navbar">
       <div class="brand">
@@ -50,6 +51,25 @@
       </section>
     </main>
 
+    <section class="feature-strip">
+  <div>
+    <strong>PDF-first</strong>
+    <span>Study directly from your notes</span>
+  </div>
+  <div>
+    <strong>Viva ready</strong>
+    <span>Generate oral exam Q&A</span>
+  </div>
+  <div>
+    <strong>Exam focused</strong>
+    <span>Create question-answer sets</span>
+  </div>
+  <div>
+    <strong>Private demo</strong>
+    <span>Your API key stays server-side</span>
+  </div>
+</section>
+
     <section id="workspace" class="workspace">
       <div class="section-heading">
         <p>Workspace</p>
@@ -66,11 +86,12 @@
             </div>
           </div>
 
-          <label class="upload-box" for="pdfInput">
+          <label class="upload-box" id="dropZone" for="pdfInput"></label>
             <input type="file" id="pdfInput" accept="application/pdf" />
             <span class="upload-icon">📄</span>
             <strong>Choose a PDF file</strong>
             <small id="fileName">No file selected</small>
+            <em>or drag and drop your PDF here</em>
           </label>
 
           <button class="primary-btn full" onclick="uploadPDF()">Upload and Extract</button>

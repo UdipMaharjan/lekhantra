@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://lekhantra-backend.onrender.com";
+const API_BASE_URL = "http://127.0.0.1:8000";
 
 let currentTextFile = null;
 
@@ -6,6 +6,8 @@ const pdfInput = document.getElementById("pdfInput");
 const fileName = document.getElementById("fileName");
 const uploadStatus = document.getElementById("uploadStatus");
 const outputBox = document.getElementById("outputBox");
+const dropZone = document.getElementById("dropZone");
+const toast = document.getElementById("toast");
 
 pdfInput.addEventListener("change", () => {
   if (pdfInput.files.length > 0) {
@@ -13,6 +15,38 @@ pdfInput.addEventListener("change", () => {
   } else {
     fileName.textContent = "No file selected";
   }
+});
+
+dropZone.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  dropZone.classList.add("drag-over");
+});
+
+dropZone.addEventListener("dragleave", () => {
+  dropZone.classList.remove("drag-over");
+});
+
+dropZone.addEventListener("drop", (event) => {
+  event.preventDefault();
+  dropZone.classList.remove("drag-over");
+
+  const droppedFile = event.dataTransfer.files[0];
+
+  if (!droppedFile) {
+    return;
+  }
+
+  if (droppedFile.type !== "application/pdf") {
+    showToast("Please upload a PDF file only.", "error");
+    return;
+  }
+
+  const dataTransfer = new DataTransfer();
+  dataTransfer.items.add(droppedFile);
+  pdfInput.files = dataTransfer.files;
+
+  fileName.textContent = droppedFile.name;
+  showToast("PDF selected successfully.");
 });
 
 function setOutput(content) {
@@ -52,6 +86,15 @@ function getErrorMessage(data) {
   return "Something went wrong.";
 }
 
+function showToast(message, type = "success") {
+  toast.textContent = message;
+  toast.className = `toast show ${type}`;
+
+  setTimeout(() => {
+    toast.className = "toast";
+  }, 2800);
+}
+
 
 async function uploadPDF() {
   const file = pdfInput.files[0];
@@ -83,7 +126,7 @@ async function uploadPDF() {
 
     if (data.status === "success") {
       currentTextFile = data.text_file;
-
+      showToast("PDF uploaded successfully.");
       uploadStatus.innerHTML = `
         <strong>Uploaded:</strong> ${data.filename}<br>
         <strong>Text file:</strong> ${data.text_file}<br>
@@ -134,6 +177,7 @@ if (count < 1 || count > 10) {
 
     const data = await response.json();
     setOutput(formatOutput(data));
+    showToast("Viva questions generated.");
   } catch (error) {
     setOutput(`Error: ${error.message}`);
   } finally {
@@ -170,6 +214,7 @@ if (count < 1 || count > 10) {
 
     const data = await response.json();
     setOutput(formatOutput(data));
+    showToast("Exam questions generated.");
   } catch (error) {
     setOutput(`Error: ${error.message}`);
   } finally {
@@ -206,6 +251,7 @@ async function askPDF() {
 
     const data = await response.json();
     setOutput(formatOutput(data));
+    showToast("Answer generated.");
   } catch (error) {
     setOutput(`Error: ${error.message}`);
   } finally {
@@ -221,15 +267,15 @@ async function copyOutput() {
   const text = outputBox.textContent;
 
   if (!text || text === "Your generated answers will appear here.") {
-    alert("There is nothing to copy yet.");
+    showToast("There is nothing to copy yet.", "error");
     return;
   }
 
   try {
     await navigator.clipboard.writeText(text);
-    alert("Copied to clipboard.");
+    showToast("Copied to clipboard.");
   } catch (error) {
-    alert("Could not copy text.");
+    showToast("Could not copy text.", "error");
   }
 }
 
@@ -237,7 +283,7 @@ function downloadOutput() {
   const text = outputBox.textContent;
 
   if (!text || text === "Your generated answers will appear here.") {
-    alert("There is nothing to download yet.");
+    showToast("There is nothing to download yet.", "error");
     return;
   }
 
@@ -250,4 +296,5 @@ function downloadOutput() {
   link.click();
 
   URL.revokeObjectURL(url);
+  showToast("Output downloaded.");
 }
