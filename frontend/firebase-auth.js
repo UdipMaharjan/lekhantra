@@ -44,6 +44,9 @@ const authMessage = document.getElementById("authMessage");
 const userMenu = document.getElementById("userMenu");
 const userAvatar = document.getElementById("userAvatar");
 const userGreeting = document.getElementById("userGreeting");
+const profileTrigger = document.getElementById("profileTrigger");
+const profileDropdown = document.getElementById("profileDropdown");
+const manageProfileBtn = document.getElementById("manageProfileBtn");
 const logoutBtn = document.getElementById("logoutBtn");
 
 function openAuthModal() {
@@ -178,7 +181,33 @@ authPassword.addEventListener("keydown", (event) => {
 });
 
 logoutBtn.addEventListener("click", async () => {
+  profileDropdown.classList.add("hidden");
   await signOut(auth);
+
+  if (typeof showToast === "function") {
+    showToast("Logged out successfully.");
+  }
+});
+
+profileTrigger.addEventListener("click", (event) => {
+  event.stopPropagation();
+  profileDropdown.classList.toggle("hidden");
+});
+
+document.addEventListener("click", () => {
+  profileDropdown.classList.add("hidden");
+});
+
+profileDropdown.addEventListener("click", (event) => {
+  event.stopPropagation();
+});
+
+manageProfileBtn.addEventListener("click", () => {
+  profileDropdown.classList.add("hidden");
+
+  if (typeof showToast === "function") {
+    showToast("Profile management coming soon.");
+  }
 });
 
 onAuthStateChanged(auth, async (user) => {
@@ -198,12 +227,14 @@ onAuthStateChanged(auth, async (user) => {
       showToast("Signed in successfully.");
     }
   } else {
+    
     window.lekhantraAuth.currentUser = null;
     window.lekhantraAuth.idToken = null;
 
     openAuthBtn.classList.remove("hidden");
 
     userMenu.classList.add("hidden");
+    profileDropdown.classList.add("hidden");
     userAvatar.src = "";
     userGreeting.textContent = "Hey, User";
   }

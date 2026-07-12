@@ -52,8 +52,15 @@
 
 <div class="user-menu hidden" id="userMenu">
   <span id="userGreeting">Hey, User</span>
-  <img id="userAvatar" alt="User profile" />
-  <button class="logout-btn" id="logoutBtn" type="button">Logout</button>
+
+  <button class="profile-trigger" id="profileTrigger" type="button">
+    <img id="userAvatar" alt="User profile" />
+  </button>
+
+  <div class="profile-dropdown hidden" id="profileDropdown">
+    <button type="button" id="manageProfileBtn">Manage Profile</button>
+    <button type="button" id="logoutBtn">Logout</button>
+  </div>
 </div>
   </nav>
 </header>
