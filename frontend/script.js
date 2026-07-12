@@ -427,3 +427,11 @@ function downloadOutput() {
   URL.revokeObjectURL(url);
   showToast("Output downloaded.");
 }
+const homeBrand = document.getElementById("homeBrand");
+
+if (homeBrand) {
+  homeBrand.addEventListener("click", function (event) {
+    event.preventDefault();
+    window.location.reload();
+  });
+}
