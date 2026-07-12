@@ -9,6 +9,15 @@ def initialize_firebase():
     if firebase_admin._apps:
         return
 
+    service_account_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+
+    if service_account_json:
+        import json
+        service_account_info = json.loads(service_account_json)
+        cred = credentials.Certificate(service_account_info)
+        firebase_admin.initialize_app(cred)
+        return
+
     service_account_path = os.getenv(
         "FIREBASE_SERVICE_ACCOUNT_PATH",
         "firebase-service-account.json"
@@ -19,7 +28,6 @@ def initialize_firebase():
 
     cred = credentials.Certificate(service_account_path)
     firebase_admin.initialize_app(cred)
-
 
 def get_current_user(authorization: str = Header(None)):
     initialize_firebase()
