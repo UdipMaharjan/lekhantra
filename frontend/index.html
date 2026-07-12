@@ -48,12 +48,11 @@
       PDF • Exams • Viva
     </div>
 
-    <button class="login-btn" id="googleLoginBtn" type="button">Login</button>
-<button class="signup-btn" id="googleSignupBtn" type="button">Sign Up</button>
+<button class="signup-btn" id="openAuthBtn" type="button">Sign In</button>
 
 <div class="user-menu hidden" id="userMenu">
+  <span id="userGreeting">Hey, User</span>
   <img id="userAvatar" alt="User profile" />
-  <span id="userName"></span>
   <button class="logout-btn" id="logoutBtn" type="button">Logout</button>
 </div>
   </nav>
@@ -180,6 +179,40 @@
       </section>
     </section>
   </div>
+  <div class="auth-modal hidden" id="authModal">
+  <div class="auth-card">
+    <button class="auth-close" id="authCloseBtn" type="button">×</button>
+
+    <div class="brand-mark auth-logo">ल</div>
+
+    <p class="access-eyebrow">Welcome to Lekhantra</p>
+    <h2>Sign in to continue</h2>
+    <p class="auth-subtitle">
+      Use your email and password, or continue instantly with Google.
+    </p>
+
+    <div class="auth-form">
+  <input type="text" id="authFullName" placeholder="Full name for new account" />
+  <input type="email" id="authEmail" placeholder="Email address" />
+  <input type="password" id="authPassword" placeholder="Password" />
+
+      <button id="emailSignInBtn" type="button">Sign In</button>
+      <button class="login-btn" id="emailCreateBtn" type="button">Create Account</button>
+
+      <div class="auth-divider">
+        <span></span>
+        <small>or</small>
+        <span></span>
+      </div>
+
+      <button class="google-btn" id="googleContinueBtn" type="button">
+        Continue with Google
+      </button>
+    </div>
+
+    <small id="authMessage"></small>
+  </div>
+</div>
   <script type="module" src="firebase-auth.js"></script>
   <script src="script.js"></script>
 
