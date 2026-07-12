@@ -1,7 +1,7 @@
 import os
 
 import firebase_admin
-from firebase_admin import auth, credentials
+from firebase_admin import auth, credentials, firestore
 from fastapi import Header, HTTPException
 
 
@@ -69,3 +69,7 @@ def get_current_user(authorization: str = Header(None)):
                 "message": "Invalid or expired login token."
             }
         )
+    
+def get_firestore_client():
+    initialize_firebase()
+    return firestore.client()    

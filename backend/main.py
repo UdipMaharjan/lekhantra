@@ -10,7 +10,8 @@ from ai_utils import generate_ai_response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from auth_utils import get_current_user
+from auth_utils import get_current_user, get_firestore_client
+from usage_utils import log_usage
 
 
 app = FastAPI(
@@ -203,8 +204,19 @@ async def upload_pdf(file: UploadFile = File(...),current_user: dict = Depends(g
 
     with open(text_path, "w", encoding="utf-8") as text_file:
         text_file.write(extracted_text)
-
+    log_usage(
+    current_user,
+    "upload_pdf",
+    {
+        "original_filename": file.filename,
+        "saved_pdf": safe_pdf_filename,
+        "text_file": text_filename,
+        "file_size_mb": round(len(file_content) / (1024 * 1024), 2),
+        "total_characters": len(extracted_text),
+    }
+)
     return {
+        
         "status": "success",
         "original_filename": file.filename,
         "saved_pdf": safe_pdf_filename,
@@ -290,7 +302,16 @@ Study notes:
 """
 
     ai_output = generate_ai_response(prompt)
-
+    
+    log_usage(
+    current_user,
+    "ai_generate_viva",
+    {
+        "text_file": request.text_file,
+        "number_of_questions": request.number_of_questions,
+        "text_characters_used": min(len(text), MAX_AI_TEXT_CHARS),
+    }
+)
     return {
         "status": "success",
         "text_file": request.text_file,
@@ -328,6 +349,16 @@ Study notes:
 """
 
     ai_output = generate_ai_response(prompt)
+
+    log_usage(
+    current_user,
+    "ai_generate_exam",
+    {
+        "text_file": request.text_file,
+        "number_of_questions": request.number_of_questions,
+        "text_characters_used": min(len(text), MAX_AI_TEXT_CHARS),
+    }
+)
 
     return {
         "status": "success",
@@ -368,12 +399,53 @@ User question:
 
     ai_output = generate_ai_response(prompt)
 
+    log_usage(
+    current_user,
+    "ask_pdf",
+    {
+        "text_file": request.text_file,
+        "question": request.question,
+        "text_characters_used": min(len(text), MAX_AI_TEXT_CHARS),
+    }
+)
+
     return {
         "status": "success",
         "text_file": request.text_file,
         "question": request.question,
         "answer": ai_output
     }
+
+
+@app.get("/usage-logs")
+def get_usage_logs(current_user: dict = Depends(get_current_user)):
+    db = get_firestore_client()
+
+    logs_ref = (
+        db.collection("usage_logs")
+        .order_by("timestamp", direction="DESCENDING")
+        .limit(20)
+    )
+
+    logs = []
+
+    for doc in logs_ref.stream():
+        data = doc.to_dict()
+
+        timestamp = data.get("timestamp")
+        if timestamp:
+            data["timestamp"] = timestamp.isoformat()
+
+        logs.append({
+            "id": doc.id,
+            **data
+        })
+
+    return {
+        "status": "success",
+        "logs": logs
+    }
+
 if __name__ == "__main__":
     import uvicorn
 
