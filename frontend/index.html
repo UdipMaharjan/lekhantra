@@ -48,8 +48,14 @@
       PDF • Exams • Viva
     </div>
 
-    <button class="login-btn" type="button">Login</button>
-    <button class="signup-btn" type="button">Sign Up</button>
+    <button class="login-btn" id="googleLoginBtn" type="button">Login</button>
+<button class="signup-btn" id="googleSignupBtn" type="button">Sign Up</button>
+
+<div class="user-menu hidden" id="userMenu">
+  <img id="userAvatar" alt="User profile" />
+  <span id="userName"></span>
+  <button class="logout-btn" id="logoutBtn" type="button">Logout</button>
+</div>
   </nav>
 </header>
 
@@ -174,7 +180,8 @@
       </section>
     </section>
   </div>
-
+  <script type="module" src="firebase-auth.js"></script>
   <script src="script.js"></script>
+
 </body>
 </html>

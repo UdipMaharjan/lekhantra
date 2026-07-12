@@ -149,6 +149,19 @@ function getErrorMessage(data) {
   return "Something went wrong.";
 }
 
+function getAuthHeaders() {
+  const token = window.lekhantraAuth?.idToken;
+
+  if (!token) {
+    showToast("Please login first.", "error");
+    return null;
+  }
+
+  return {
+    "Authorization": `Bearer ${token}`
+  };
+}
+
 function showToast(message, type = "success") {
   toast.textContent = message;
   toast.className = `toast show ${type}`;
@@ -157,13 +170,17 @@ function showToast(message, type = "success") {
     toast.className = "toast";
   }, 2800);
 }
-
-
 async function uploadPDF() {
   const file = pdfInput.files[0];
 
   if (!file) {
     uploadStatus.textContent = "Please choose a PDF first.";
+    return;
+  }
+
+  const authHeaders = getAuthHeaders();
+
+  if (!authHeaders) {
     return;
   }
 
@@ -176,24 +193,28 @@ async function uploadPDF() {
   try {
     const response = await fetch(`${API_BASE_URL}/upload-pdf`, {
       method: "POST",
+      headers: authHeaders,
       body: formData
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-    uploadStatus.textContent = getErrorMessage(data);
-    setOutput(JSON.stringify(data, null, 2));
-    return;
+      uploadStatus.textContent = getErrorMessage(data);
+      setOutput(JSON.stringify(data, null, 2));
+      showToast(getErrorMessage(data), "error");
+      return;
     }
 
     if (data.status === "success") {
       currentTextFile = data.text_file;
       showToast("PDF uploaded successfully.");
+
       uploadStatus.innerHTML = `
-        <strong>Uploaded:</strong> ${data.filename}<br>
+        <strong>Uploaded:</strong> ${data.original_filename}<br>
         <strong>Text file:</strong> ${data.text_file}<br>
-        <strong>Characters:</strong> ${data.total_characters}
+        <strong>Characters:</strong> ${data.total_characters}<br>
+        <strong>Size:</strong> ${data.file_size_mb} MB
       `;
 
       setOutput(
@@ -202,27 +223,34 @@ async function uploadPDF() {
     } else {
       uploadStatus.textContent = data.message || "Upload failed.";
       setOutput(JSON.stringify(data, null, 2));
+      showToast(data.message || "Upload failed.", "error");
     }
   } catch (error) {
     uploadStatus.textContent = "Could not connect to backend.";
     setOutput(`Error: ${error.message}`);
+    showToast("Could not connect to backend.", "error");
   } finally {
     stopLoading();
   }
 }
-
 async function generateViva() {
   if (!currentTextFile) {
     setOutput("Please upload a PDF first.");
     return;
   }
 
-let count = Number(document.getElementById("questionCount").value) || 5;
+  const authHeaders = getAuthHeaders();
 
-if (count < 1 || count > 10) {
-  setOutput("Please enter a number of questions between 1 and 10.");
-  return;
-}
+  if (!authHeaders) {
+    return;
+  }
+
+  let count = Number(document.getElementById("questionCount").value) || 5;
+
+  if (count < 1 || count > 10) {
+    setOutput("Please enter a number of questions between 1 and 10.");
+    return;
+  }
 
   setLoading("Generating viva questions with Lekhantra...");
 
@@ -230,7 +258,8 @@ if (count < 1 || count > 10) {
     const response = await fetch(`${API_BASE_URL}/ai-generate-viva`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        ...authHeaders
       },
       body: JSON.stringify({
         text_file: currentTextFile,
@@ -239,27 +268,40 @@ if (count < 1 || count > 10) {
     });
 
     const data = await response.json();
+
+    if (!response.ok) {
+      setOutput(getErrorMessage(data));
+      showToast(getErrorMessage(data), "error");
+      return;
+    }
+
     setOutput(formatOutput(data));
     showToast("Viva questions generated.");
   } catch (error) {
     setOutput(`Error: ${error.message}`);
+    showToast("Could not generate viva questions.", "error");
   } finally {
     stopLoading();
   }
 }
-
 async function generateExam() {
   if (!currentTextFile) {
     setOutput("Please upload a PDF first.");
     return;
   }
 
-let count = Number(document.getElementById("questionCount").value) || 5;
+  const authHeaders = getAuthHeaders();
 
-if (count < 1 || count > 10) {
-  setOutput("Please enter a number of questions between 1 and 10.");
-  return;
-}
+  if (!authHeaders) {
+    return;
+  }
+
+  let count = Number(document.getElementById("questionCount").value) || 5;
+
+  if (count < 1 || count > 10) {
+    setOutput("Please enter a number of questions between 1 and 10.");
+    return;
+  }
 
   setLoading("Generating exam questions with Lekhantra...");
 
@@ -267,7 +309,8 @@ if (count < 1 || count > 10) {
     const response = await fetch(`${API_BASE_URL}/ai-generate-exam`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        ...authHeaders
       },
       body: JSON.stringify({
         text_file: currentTextFile,
@@ -276,10 +319,18 @@ if (count < 1 || count > 10) {
     });
 
     const data = await response.json();
+
+    if (!response.ok) {
+      setOutput(getErrorMessage(data));
+      showToast(getErrorMessage(data), "error");
+      return;
+    }
+
     setOutput(formatOutput(data));
     showToast("Exam questions generated.");
   } catch (error) {
     setOutput(`Error: ${error.message}`);
+    showToast("Could not generate exam questions.", "error");
   } finally {
     stopLoading();
   }
@@ -288,6 +339,12 @@ if (count < 1 || count > 10) {
 async function askPDF() {
   if (!currentTextFile) {
     setOutput("Please upload a PDF first.");
+    return;
+  }
+
+  const authHeaders = getAuthHeaders();
+
+  if (!authHeaders) {
     return;
   }
 
@@ -304,7 +361,8 @@ async function askPDF() {
     const response = await fetch(`${API_BASE_URL}/ask-pdf`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        ...authHeaders
       },
       body: JSON.stringify({
         text_file: currentTextFile,
@@ -313,10 +371,18 @@ async function askPDF() {
     });
 
     const data = await response.json();
+
+    if (!response.ok) {
+      setOutput(getErrorMessage(data));
+      showToast(getErrorMessage(data), "error");
+      return;
+    }
+
     setOutput(formatOutput(data));
     showToast("Answer generated.");
   } catch (error) {
     setOutput(`Error: ${error.message}`);
+    showToast("Could not generate answer.", "error");
   } finally {
     stopLoading();
   }

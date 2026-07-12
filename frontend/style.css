@@ -848,3 +848,60 @@ pre.loading::before {
   color: #8b2f2f;
   font-weight: 800;
 }
+
+.hidden {
+  display: none !important;
+}
+
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 6px;
+  border-radius: 999px;
+  background: rgba(91, 31, 40, 0.07);
+  border: 1px solid rgba(91, 31, 40, 0.12);
+}
+
+.user-menu img {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(91, 31, 40, 0.12);
+}
+
+.user-menu span {
+  max-width: 120px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--deep-maroon);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.logout-btn {
+  padding: 8px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  box-shadow: none;
+  background: rgba(91, 31, 40, 0.1);
+  color: var(--maroon);
+}
+
+@media (max-width: 420px) {
+  .user-menu span {
+    display: none;
+  }
+
+  .logout-btn {
+    padding: 7px 8px;
+    font-size: 10px;
+  }
+
+  .user-menu img {
+    width: 30px;
+    height: 30px;
+  }
+}

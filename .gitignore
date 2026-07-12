@@ -24,3 +24,6 @@ uploads/
 
 # Logs
 *.log
+
+#firebase
+backend/firebase-service-account.json
