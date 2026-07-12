@@ -2,7 +2,7 @@ import os
 import shutil
 import uuid
 from pathlib import Path
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from pydantic import BaseModel, Field
 from question_utils import generate_viva_questions, generate_exam_questions
 from pdf_utils import extract_text_from_pdf
@@ -10,6 +10,7 @@ from ai_utils import generate_ai_response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from auth_utils import get_current_user
 
 
 app = FastAPI(
@@ -24,6 +25,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/me")
+def get_me(current_user: dict = Depends(get_current_user)):
+    return {
+        "status": "success",
+        "user": current_user
+    }
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc):
@@ -156,7 +164,7 @@ def chat(request: ChatRequest):
 
 
 @app.post("/upload-pdf")
-async def upload_pdf(file: UploadFile = File(...)):
+async def upload_pdf(file: UploadFile = File(...),current_user: dict = Depends(get_current_user)):
     if not file.filename:
         raise HTTPException(
             status_code=400,
@@ -254,7 +262,7 @@ def generate_exam(request: QuestionRequest):
     }
 
 @app.post("/ai-generate-viva")
-def ai_generate_viva(request: AIQuestionRequest):
+def ai_generate_viva(request: AIQuestionRequest, current_user: dict = Depends(get_current_user)):
     text_path = get_text_path(request.text_file)
 
     if not os.path.exists(text_path):
@@ -291,7 +299,7 @@ Study notes:
     }
 
 @app.post("/ai-generate-exam")
-def ai_generate_exam(request: AIQuestionRequest):
+def ai_generate_exam(request: AIQuestionRequest,  current_user: dict = Depends(get_current_user)):
     text_path = get_text_path(request.text_file)
 
     if not os.path.exists(text_path):
@@ -329,7 +337,7 @@ Study notes:
     }
 
 @app.post("/ask-pdf")
-def ask_pdf(request: AskPDFRequest):
+def ask_pdf(request: AskPDFRequest,  current_user: dict = Depends(get_current_user)):
     text_path = get_text_path(request.text_file)
 
     if not os.path.exists(text_path):
