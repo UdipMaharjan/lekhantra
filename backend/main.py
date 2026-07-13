@@ -2,7 +2,7 @@ import os
 import shutil
 import uuid
 from pathlib import Path
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Response
 from pydantic import BaseModel, Field
 from question_utils import generate_viva_questions, generate_exam_questions
 from pdf_utils import extract_text_from_pdf
@@ -90,6 +90,15 @@ def health_check():
         "status": "ok",
         "service": "Lekhantra backend"
     }
+
+@app.head("/health")
+def health_check_head():
+    return Response(status_code=200)
+
+
+@app.head("/")
+def root_head():
+    return Response(status_code=200)
 
 
 def create_error_response(message: str, details: str | None = None):
