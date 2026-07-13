@@ -435,3 +435,11 @@ if (homeBrand) {
     window.location.reload();
   });
 }
+const footerHomeBrand = document.getElementById("footerHomeBrand");
+
+if (footerHomeBrand) {
+  footerHomeBrand.addEventListener("click", function (event) {
+    event.preventDefault();
+    window.location.reload();
+  });
+}
