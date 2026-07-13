@@ -467,6 +467,22 @@ textarea {
   color: var(--ink);
   outline: none;
 }
+.google-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  width: 100% !important;
+}
+
+.google-icon {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  max-width: 20px !important;
+  display: inline-block !important;
+  flex-shrink: 0 !important;
+}
 
 input:focus,
 textarea:focus {
@@ -1587,4 +1603,9 @@ pre.loading::before {
   color: rgba(255, 247, 232, 0.76);
   font-size: 13px;
   font-weight: 700;
+}
+.social-icon {
+  width: 15px;
+  height: 15px;
+  display: block;
 }
