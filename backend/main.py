@@ -84,6 +84,14 @@ class AskPDFRequest(BaseModel):
 class AccessRequest(BaseModel):
     access_code: str
 
+@app.get("/health")
+def health_check():
+    return {
+        "status": "ok",
+        "service": "Lekhantra backend"
+    }
+
+
 def create_error_response(message: str, details: str | None = None):
     response = {
         "status": "error",
