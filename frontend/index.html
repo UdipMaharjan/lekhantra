@@ -34,38 +34,41 @@
     <small id="accessMessage"></small>
   </div>
 </div>
-  <div class="page-shell locked" id="appShell">
+<div class="page-shell locked" id="appShell">
   <header class="site-header">
-<a href="#" class="brand" id="homeBrand">
-  <img src="assets/logo.png" alt="Lekhantra logo" class="brand-logo" />
+    <a href="#" class="brand" id="homeBrand">
+      <img src="assets/logo.png" alt="Lekhantra logo" class="brand-logo" />
 
-  <div class="brand-copy">
-    <h1>Lekhantra</h1>
-    <p>AI Study Assistant</p>
-  </div>
-</a>
+      <div class="brand-copy">
+        <h1>Lekhantra</h1>
+        <p>AI Study Assistant</p>
+      </div>
+    </a>
 
-  <nav class="header-actions">
-    <div class="nav-pill">
-      PDF • Exams • Viva
+    <nav class="nav-links">
+      <a href="#">Product</a>
+      <a href="#">Features</a>
+      <a href="#">Pricing</a>
+      <a href="#">Contact</a>
+    </nav>
+
+    <div class="header-actions">
+      <button class="signup-btn" id="openAuthBtn" type="button">Sign In</button>
+
+      <div class="user-menu hidden" id="userMenu">
+        <span id="userGreeting">Hey, User</span>
+
+        <button class="profile-trigger" id="profileTrigger" type="button">
+          <img id="userAvatar" alt="User profile" />
+        </button>
+
+        <div class="profile-dropdown hidden" id="profileDropdown">
+          <button type="button" id="manageProfileBtn">Manage Profile</button>
+          <button type="button" id="logoutBtn">Logout</button>
+        </div>
+      </div>
     </div>
-
-<button class="signup-btn" id="openAuthBtn" type="button">Sign In</button>
-
-<div class="user-menu hidden" id="userMenu">
-  <span id="userGreeting">Hey, User</span>
-
-  <button class="profile-trigger" id="profileTrigger" type="button">
-    <img id="userAvatar" alt="User profile" />
-  </button>
-
-  <div class="profile-dropdown hidden" id="profileDropdown">
-    <button type="button" id="manageProfileBtn">Manage Profile</button>
-    <button type="button" id="logoutBtn">Logout</button>
-  </div>
-</div>
-  </nav>
-</header>
+  </header>
 
     <main class="hero-grid">
       <section class="hero-card">
