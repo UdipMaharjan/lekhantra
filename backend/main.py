@@ -81,9 +81,6 @@ class AskPDFRequest(BaseModel):
     text_file: str
     question: str   
 
-class AccessRequest(BaseModel):
-    access_code: str
-
 @app.get("/health")
 def health_check():
     return {
@@ -129,27 +126,6 @@ def get_safe_pdf_filename(original_filename: str) -> str:
 def get_text_path(text_file: str) -> str:
     safe_name = Path(text_file).name
     return os.path.join(UPLOAD_DIR, safe_name)     
-
-@app.post("/verify-access")
-def verify_access(request: AccessRequest):
-    correct_code = os.getenv("ACCESS_CODE")
-
-    if not correct_code:
-        raise HTTPException(
-            status_code=500,
-            detail=create_error_response("Access code is not configured on the server.")
-        )
-
-    if request.access_code != correct_code:
-        raise HTTPException(
-            status_code=401,
-            detail=create_error_response("Invalid access code.")
-        )
-
-    return {
-        "status": "success",
-        "message": "Access granted."
-    }
 
 @app.get("/")
 def home():
