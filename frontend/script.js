@@ -1,6 +1,10 @@
-const API_BASE_URL = "https://lekhantra-backend.onrender.com";
+const API_BASE_URL =
+  window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+    ? "http://127.0.0.1:8000"
+    : "https://lekhantra-backend.onrender.com";
 
 let currentTextFile = null;
+let loadingBubble = null;
 
 const pdfInput = document.getElementById("pdfInput");
 const fileName = document.getElementById("fileName");
@@ -8,6 +12,42 @@ const uploadStatus = document.getElementById("uploadStatus");
 const outputBox = document.getElementById("outputBox");
 const dropZone = document.getElementById("dropZone");
 const toast = document.getElementById("toast");
+const currentFileLabel = document.getElementById("currentFileLabel");
+const currentStatusLabel = document.getElementById("currentStatusLabel");
+const pdfQuestion = document.getElementById("pdfQuestion");
+const questionCount = document.getElementById("questionCount");
+const introMessage = "Upload a PDF on the left and start asking questions here.";
+
+function setDocumentDetails(fileLabel, statusLabel) {
+  if (currentFileLabel) {
+    currentFileLabel.textContent = fileLabel || "No file selected";
+  }
+
+  if (currentStatusLabel) {
+    currentStatusLabel.textContent = statusLabel || "Waiting";
+  }
+}
+
+function clearChatThread(message = introMessage) {
+  loadingBubble = null;
+  outputBox.innerHTML = "";
+  const bubble = document.createElement("div");
+  bubble.className = "chat-bubble bot";
+  bubble.textContent = message;
+  outputBox.appendChild(bubble);
+}
+
+function addChatMessage(content, role = "bot") {
+  const bubble = document.createElement("div");
+  bubble.className = `chat-bubble ${role}`;
+  bubble.textContent = content;
+  outputBox.appendChild(bubble);
+  outputBox.scrollTop = outputBox.scrollHeight;
+  return bubble;
+}
+
+clearChatThread();
+setDocumentDetails("No file selected", "Waiting");
 
 pdfInput.addEventListener("change", () => {
   if (pdfInput.files.length > 0) {
@@ -50,16 +90,25 @@ dropZone.addEventListener("drop", (event) => {
 });
 
 function setOutput(content) {
-  outputBox.textContent = content;
+  clearChatThread(content);
 }
 
 function setLoading(message) {
+  if (loadingBubble) {
+    loadingBubble.remove();
+  }
+
   outputBox.classList.add("loading");
-  outputBox.textContent = message;
+  loadingBubble = addChatMessage(message, "bot");
 }
 
 function stopLoading() {
   outputBox.classList.remove("loading");
+
+  if (loadingBubble) {
+    loadingBubble.remove();
+    loadingBubble = null;
+  }
 }
 
 function formatOutput(data) {
@@ -125,6 +174,7 @@ async function uploadPDF() {
   formData.append("file", file);
 
   uploadStatus.textContent = "Uploading and extracting text...";
+  setDocumentDetails(file.name, "Uploading...");
   setLoading("Reading your PDF...");
 
   try {
@@ -147,6 +197,8 @@ async function uploadPDF() {
       currentTextFile = data.text_file;
       showToast("PDF uploaded successfully.");
 
+      setDocumentDetails(data.original_filename, `Uploaded (${data.total_characters} chars)`);
+
       uploadStatus.innerHTML = `
         <strong>Uploaded:</strong> ${data.original_filename}<br>
         <strong>Text file:</strong> ${data.text_file}<br>
@@ -154,17 +206,17 @@ async function uploadPDF() {
         <strong>Size:</strong> ${data.file_size_mb} MB
       `;
 
-      setOutput(
-        `PDF uploaded successfully.\n\nText preview:\n\n${data.text_preview}`
-      );
+      clearChatThread();
+      addChatMessage(`PDF uploaded successfully: ${data.original_filename}`, "bot");
+      addChatMessage(`Text preview:\n\n${data.text_preview}`, "bot");
     } else {
       uploadStatus.textContent = data.message || "Upload failed.";
-      setOutput(JSON.stringify(data, null, 2));
+      addChatMessage(data.message || "Upload failed.", "bot");
       showToast(data.message || "Upload failed.", "error");
     }
   } catch (error) {
     uploadStatus.textContent = "Could not connect to backend.";
-    setOutput(`Error: ${error.message}`);
+    addChatMessage(`Error: ${error.message}`, "bot");
     showToast("Could not connect to backend.", "error");
   } finally {
     stopLoading();
@@ -182,13 +234,14 @@ async function generateViva() {
     return;
   }
 
-  let count = Number(document.getElementById("questionCount").value) || 5;
+  let count = Number(questionCount.value) || 5;
 
   if (count < 1 || count > 10) {
-    setOutput("Please enter a number of questions between 1 and 10.");
+    addChatMessage("Please enter a number of questions between 1 and 10.", "bot");
     return;
   }
 
+  addChatMessage(`Generate ${count} viva questions`, "user");
   setLoading("Generating viva questions with Lekhantra...");
 
   try {
@@ -207,15 +260,15 @@ async function generateViva() {
     const data = await response.json();
 
     if (!response.ok) {
-      setOutput(getErrorMessage(data));
+      addChatMessage(getErrorMessage(data), "bot");
       showToast(getErrorMessage(data), "error");
       return;
     }
 
-    setOutput(formatOutput(data));
+    addChatMessage(formatOutput(data), "bot");
     showToast("Viva questions generated.");
   } catch (error) {
-    setOutput(`Error: ${error.message}`);
+    addChatMessage(`Error: ${error.message}`, "bot");
     showToast("Could not generate viva questions.", "error");
   } finally {
     stopLoading();
@@ -233,13 +286,14 @@ async function generateExam() {
     return;
   }
 
-  let count = Number(document.getElementById("questionCount").value) || 5;
+  let count = Number(questionCount.value) || 5;
 
   if (count < 1 || count > 10) {
-    setOutput("Please enter a number of questions between 1 and 10.");
+    addChatMessage("Please enter a number of questions between 1 and 10.", "bot");
     return;
   }
 
+  addChatMessage(`Generate ${count} exam questions`, "user");
   setLoading("Generating exam questions with Lekhantra...");
 
   try {
@@ -258,15 +312,15 @@ async function generateExam() {
     const data = await response.json();
 
     if (!response.ok) {
-      setOutput(getErrorMessage(data));
+      addChatMessage(getErrorMessage(data), "bot");
       showToast(getErrorMessage(data), "error");
       return;
     }
 
-    setOutput(formatOutput(data));
+    addChatMessage(formatOutput(data), "bot");
     showToast("Exam questions generated.");
   } catch (error) {
-    setOutput(`Error: ${error.message}`);
+    addChatMessage(`Error: ${error.message}`, "bot");
     showToast("Could not generate exam questions.", "error");
   } finally {
     stopLoading();
@@ -285,13 +339,14 @@ async function askPDF() {
     return;
   }
 
-  const question = document.getElementById("pdfQuestion").value.trim();
+  const question = pdfQuestion.value.trim();
 
   if (!question) {
-    setOutput("Please type a question first.");
+    addChatMessage("Please type a question first.", "bot");
     return;
   }
 
+  addChatMessage(question, "user");
   setLoading("Lekhantra is reading your notes...");
 
   try {
@@ -310,15 +365,15 @@ async function askPDF() {
     const data = await response.json();
 
     if (!response.ok) {
-      setOutput(getErrorMessage(data));
+      addChatMessage(getErrorMessage(data), "bot");
       showToast(getErrorMessage(data), "error");
       return;
     }
 
-    setOutput(formatOutput(data));
+    addChatMessage(formatOutput(data), "bot");
     showToast("Answer generated.");
   } catch (error) {
-    setOutput(`Error: ${error.message}`);
+    addChatMessage(`Error: ${error.message}`, "bot");
     showToast("Could not generate answer.", "error");
   } finally {
     stopLoading();
@@ -326,13 +381,13 @@ async function askPDF() {
 }
 
 function clearOutput() {
-  setOutput("Your generated answers will appear here.");
+  clearChatThread();
 }
 
 async function copyOutput() {
-  const text = outputBox.textContent;
+  const text = outputBox.innerText;
 
-  if (!text || text === "Your generated answers will appear here.") {
+  if (!text || text === introMessage) {
     showToast("There is nothing to copy yet.", "error");
     return;
   }
@@ -346,9 +401,9 @@ async function copyOutput() {
 }
 
 function downloadOutput() {
-  const text = outputBox.textContent;
+  const text = outputBox.innerText;
 
-  if (!text || text === "Your generated answers will appear here.") {
+  if (!text || text === introMessage) {
     showToast("There is nothing to download yet.", "error");
     return;
   }
