@@ -2755,6 +2755,8 @@ ul, ol {
   padding: var(--space-6);
   position: relative;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
 .modal-close {
@@ -2786,6 +2788,13 @@ ul, ol {
 .modal-header {
   text-align: center;
   margin-bottom: var(--space-5);
+  width: 100%;
+  padding: 0;
+  border: none;
+  display: block;
+  flex: none;
+  align-items: unset;
+  justify-content: unset;
 }
 
 .auth-logo {
@@ -2803,20 +2812,22 @@ ul, ol {
   text-transform: uppercase;
   letter-spacing: 1px;
   font-weight: 600;
-  margin-bottom: var(--space-2);
+  margin: 0 0 var(--space-2) 0;
+  display: block;
 }
 
 .modal-header h2 {
   font-size: var(--text-2xl);
   font-weight: 700;
   color: var(--color-text-primary);
-  margin-bottom: var(--space-2);
+  margin: 0 0 var(--space-2) 0;
 }
 
 .auth-subtitle {
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
   line-height: 1.5;
+  margin: 0;
 }
 
 .modal {
@@ -2890,6 +2901,7 @@ ul, ol {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  flex: 1;
 }
 
 .form-group {
@@ -2906,6 +2918,7 @@ ul, ol {
   background: var(--color-bg-card);
   color: var(--color-text-primary);
   box-sizing: border-box;
+  display: block;
 }
 
 .form-group input:focus {
@@ -3380,4 +3393,52 @@ ul, ol {
   .modal-header h2 {
     font-size: var(--text-xl);
   }
+}
+
+/* ============================================
+   Auth Modal Specific Overrides
+   ============================================ */
+
+/* Override generic .modal styles for auth-modal */
+.modal.auth-modal {
+  background-color: var(--color-bg-card);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-2xl);
+  width: 100%;
+  max-width: 420px;
+  margin: var(--space-4);
+  padding: var(--space-6);
+  position: relative;
+  box-sizing: border-box;
+  overflow: visible;
+  max-height: none;
+  animation: none;
+}
+
+/* Override generic .modal-header for auth modal */
+.modal.auth-modal .modal-header {
+  text-align: center;
+  margin-bottom: var(--space-5);
+  padding: 0;
+  border: none;
+  display: block;
+  flex-direction: unset;
+  align-items: unset;
+  justify-content: unset;
+  width: 100%;
+}
+
+/* Ensure auth form text is properly aligned */
+.modal.auth-modal .auth-form {
+  text-align: left;
+  width: 100%;
+}
+
+.modal.auth-modal .auth-form .form-group {
+  width: 100%;
+}
+
+.modal.auth-modal .auth-form input {
+  width: 100%;
+  display: block;
 }
