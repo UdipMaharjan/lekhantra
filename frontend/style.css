@@ -3014,6 +3014,18 @@ ul, ol {
   background: var(--color-primary-hover);
 }
 
+/* User Menu */
+.user-menu {
+  display: none;
+  align-items: center;
+  gap: var(--space-2);
+  position: relative;
+}
+
+.user-menu:not(.hidden) {
+  display: flex;
+}
+
 /* Generator Modal */
 .generator-modal {
   max-width: 600px;
