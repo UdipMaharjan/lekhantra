@@ -2744,21 +2744,29 @@ ul, ol {
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
-  z-index: 400;
   padding: var(--space-4);
+  z-index: 400;
+  overflow-y: auto;
+}
+
+.modal-overlay:not(.hidden) {
+  display: flex;
 }
 
 .modal {
   background: var(--color-bg-card);
   border-radius: var(--radius-2xl);
   box-shadow: var(--shadow-2xl);
-  max-width: 480px;
-  width: 100%;
-  padding: var(--space-8);
+  max-width: 440px;
+  width: calc(100% - 32px);
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  padding: var(--space-6);
   position: relative;
+  margin: auto;
 }
 
 .modal-close {
@@ -2790,6 +2798,7 @@ ul, ol {
   height: 64px;
   border-radius: var(--radius-lg);
   margin: 0 auto var(--space-4);
+  object-fit: cover;
 }
 
 .auth-eyebrow {
@@ -2820,6 +2829,10 @@ ul, ol {
   gap: var(--space-3);
 }
 
+.form-group {
+  width: 100%;
+}
+
 .form-group input {
   width: 100%;
   padding: var(--space-3) var(--space-4);
@@ -2827,12 +2840,18 @@ ul, ol {
   border-radius: var(--radius-md);
   font-size: var(--text-base);
   transition: all var(--transition-fast);
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
 }
 
 .form-group input:focus {
   outline: none;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-border);
+}
+
+.form-group input::placeholder {
+  color: var(--color-text-muted);
 }
 
 .btn {
@@ -2845,11 +2864,13 @@ ul, ol {
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
+  cursor: pointer;
 }
 
 .btn-primary {
   background: var(--color-primary);
   color: white;
+  border: none;
 }
 
 .btn-primary:hover {
@@ -2887,6 +2908,7 @@ ul, ol {
   gap: var(--space-3);
   color: var(--color-text-muted);
   font-size: var(--text-sm);
+  margin: var(--space-2) 0;
 }
 
 .auth-divider span {
@@ -2901,6 +2923,9 @@ ul, ol {
   text-align: center;
   margin-top: var(--space-3);
   min-height: 20px;
+  padding: var(--space-2);
+  background: var(--color-error-bg);
+  border-radius: var(--radius-md);
 }
 
 /* User Menu */
@@ -3226,5 +3251,34 @@ ul, ol {
 
   .welcome-state h1 {
     font-size: var(--text-2xl);
+  }
+
+  /* Modal mobile fixes */
+  .modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .modal {
+    max-width: 100%;
+    width: 100%;
+    max-height: 90vh;
+    border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+    padding: var(--space-5);
+    margin: 0;
+  }
+
+  .modal-close {
+    top: var(--space-3);
+    right: var(--space-3);
+  }
+
+  .auth-logo {
+    width: 56px;
+    height: 56px;
+  }
+
+  .modal-header h2 {
+    font-size: var(--text-xl);
   }
 }
