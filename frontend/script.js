@@ -17,6 +17,7 @@ let isProcessing = false;
 let typingInterval = null;
 let conversations = [];
 let currentConversationId = null;
+let pendingDeleteId = null;
 
 // ============================================================================
 // DOM Elements
@@ -57,6 +58,9 @@ const elements = {
   // Modals
   authModal: document.getElementById('authModal'),
   generatorModal: document.getElementById('generatorModal'),
+  deleteModal: document.getElementById('deleteModal'),
+  deleteConfirmBtn: document.getElementById('deleteConfirmBtn'),
+  deleteCancelBtn: document.getElementById('deleteCancelBtn'),
   generatorTitle: document.getElementById('generatorTitle'),
   generatorSubtitle: document.getElementById('generatorSubtitle'),
   generatorResult: document.getElementById('generatorResult'),
@@ -508,8 +512,29 @@ async function renameConversation(conversationId, firstQuestion) {
   }
 }
 
-async function deleteConversation(conversationId) {
-  if (!confirm('Delete this conversation?')) return;
+// Show delete confirmation modal
+function showDeleteConfirmation(conversationId) {
+  pendingDeleteId = conversationId;
+  elements.deleteModal.classList.remove('hidden');
+}
+
+// Hide delete confirmation modal
+function hideDeleteConfirmation() {
+  pendingDeleteId = null;
+  elements.deleteModal.classList.add('hidden');
+}
+
+// Called when user clicks delete button
+function deleteConversation(conversationId) {
+  showDeleteConfirmation(conversationId);
+}
+
+// Actually perform the deletion (called from modal)
+async function confirmDelete() {
+  const conversationId = pendingDeleteId;
+  if (!conversationId) return;
+
+  hideDeleteConfirmation();
 
   const authHeaders = getAuthHeaders();
   if (!authHeaders) return;
@@ -1183,6 +1208,21 @@ function initEventListeners() {
       const text = elements.generatorResult?.textContent;
       if (text) downloadText(text, 'questions.txt');
     });
+  }
+
+  // Delete confirmation modal
+  if (elements.deleteModal) {
+    elements.deleteModal.addEventListener('click', (e) => {
+      if (e.target === elements.deleteModal) {
+        hideDeleteConfirmation();
+      }
+    });
+  }
+  if (elements.deleteConfirmBtn) {
+    elements.deleteConfirmBtn.addEventListener('click', confirmDelete);
+  }
+  if (elements.deleteCancelBtn) {
+    elements.deleteCancelBtn.addEventListener('click', hideDeleteConfirmation);
   }
 
   // File input change

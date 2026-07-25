@@ -3321,6 +3321,64 @@ ul, ol {
   justify-content: center;
 }
 
+/* Delete Confirmation Modal */
+.modal.delete-modal {
+  max-width: 400px;
+  text-align: center;
+  padding: var(--space-8);
+}
+
+.modal-icon.delete-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto var(--space-4);
+  background: var(--color-error-bg);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-icon.delete-icon svg {
+  color: var(--color-error);
+}
+
+.modal.delete-modal .modal-header h2 {
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-2);
+}
+
+.delete-modal-text {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-relaxed);
+  margin: 0 0 var(--space-6);
+}
+
+.delete-modal-actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: center;
+}
+
+.delete-modal-actions .btn {
+  flex: 1;
+  padding: var(--space-3) var(--space-6);
+}
+
+.btn-danger {
+  background: var(--color-error);
+  color: var(--color-text-inverse);
+  border: none;
+  font-weight: var(--font-medium);
+}
+
+.btn-danger:hover {
+  background: #B03333;
+}
+
 /* Toast */
 .toast {
   position: fixed;
