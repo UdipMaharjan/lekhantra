@@ -551,7 +551,7 @@ def get_conversation(conversation_id: str, current_user: dict = Depends(get_curr
         print(f"[BACKEND] Conversation not found: {conversation_id}")
         raise HTTPException(status_code=404, detail={"status": "error", "message": "Conversation not found"})
 
-    conv_data = conv_doc.data()
+    conv_data = conv_doc.to_dict()
     print(f"[BACKEND] Conversation data: {conv_data}")
 
     # Security check - ensure user owns this conversation
@@ -614,7 +614,7 @@ def update_conversation(
     if not conv_doc.exists:
         raise HTTPException(status_code=404, detail={"status": "error", "message": "Conversation not found"})
 
-    conv_data = conv_doc.data()
+    conv_data = conv_doc.to_dict()
 
     if conv_data.get("user_id") != uid:
         raise HTTPException(status_code=403, detail={"status": "error", "message": "Access denied"})
@@ -648,7 +648,7 @@ def delete_conversation(conversation_id: str, current_user: dict = Depends(get_c
     if not conv_doc.exists:
         raise HTTPException(status_code=404, detail={"status": "error", "message": "Conversation not found"})
 
-    conv_data = conv_doc.data()
+    conv_data = conv_doc.to_dict()
 
     if conv_data.get("user_id") != uid:
         raise HTTPException(status_code=403, detail={"status": "error", "message": "Access denied"})
@@ -690,7 +690,7 @@ def add_message(
         print(f"[BACKEND] Conversation not found!")
         raise HTTPException(status_code=404, detail={"status": "error", "message": "Conversation not found"})
 
-    conv_data = conv_doc.data()
+    conv_data = conv_doc.to_dict()
     print(f"[BACKEND] Conversation data: {conv_data}")
 
     if conv_data.get("user_id") != uid:
