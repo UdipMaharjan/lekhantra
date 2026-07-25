@@ -2362,7 +2362,6 @@ ul, ol {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-top: 1px solid var(--color-border-light);
   min-height: 120px;
   max-height: 300px;
   flex-shrink: 0;
