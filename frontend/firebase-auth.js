@@ -68,6 +68,8 @@ function getFriendlyError(error) {
 
 // Update UI based on auth state
 function updateAuthUI(user) {
+  console.log('[FIREBASE] updateAuthUI called', { user: user ? 'present' : 'null' });
+
   const openAuthBtn = document.getElementById("openAuthBtn");
   const userMenu = document.getElementById("userMenu");
   const userAvatar = document.getElementById("userAvatar");
@@ -81,6 +83,8 @@ function updateAuthUI(user) {
     window.lekhantraAuth.idToken = null;
     window.lekhantraAuth.isAuthenticated = false;
 
+    console.log('[FIREBASE] User logged out');
+
     if (openAuthBtn) {
       openAuthBtn.classList.remove("hidden");
       openAuthBtn.style.display = "";
@@ -88,6 +92,7 @@ function updateAuthUI(user) {
     if (userMenu) userMenu.classList.add("hidden");
   } else {
     user.getIdToken().then((token) => {
+      console.log('[FIREBASE] Got ID token, length:', token?.length);
       window.lekhantraAuth.currentUser = {
         uid: user.uid,
         email: user.email,
@@ -96,6 +101,8 @@ function updateAuthUI(user) {
       };
       window.lekhantraAuth.idToken = token;
       window.lekhantraAuth.isAuthenticated = true;
+
+      console.log('[FIREBASE] User logged in:', { uid: user.uid, email: user.email });
 
       if (openAuthBtn) {
         openAuthBtn.classList.add("hidden");
@@ -326,8 +333,10 @@ function setupEventListeners() {
 
 // Initialize when DOM is ready
 function init() {
+  console.log('[FIREBASE] init called');
+
   if (!firebaseReady) {
-    console.error("Firebase not ready, will retry...");
+    console.error('[FIREBASE] Firebase not ready, will retry...');
     setTimeout(init, 500);
     return;
   }
@@ -336,10 +345,16 @@ function init() {
 
   // Listen for auth state changes
   onAuthStateChanged(auth, (user) => {
+    console.log('[FIREBASE] Auth state changed:', user ? 'logged in' : 'logged out');
     updateAuthUI(user);
+    // Load conversations when user logs in
+    if (user && typeof loadConversations === 'function') {
+      console.log('[FIREBASE] Calling loadConversations after login');
+      loadConversations();
+    }
   });
 
-  console.log("Firebase Auth initialized");
+  console.log('[FIREBASE] Firebase Auth initialized');
 }
 
 // Start initialization

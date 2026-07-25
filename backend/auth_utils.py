@@ -30,9 +30,13 @@ def initialize_firebase():
     firebase_admin.initialize_app(cred)
 
 def get_current_user(authorization: str = Header(None)):
+    print(f"[AUTH] get_current_user called")
+    print(f"[AUTH] authorization header present: {bool(authorization)}")
+
     initialize_firebase()
 
     if not authorization:
+        print("[AUTH] No authorization header!")
         raise HTTPException(
             status_code=401,
             detail={
@@ -42,6 +46,7 @@ def get_current_user(authorization: str = Header(None)):
         )
 
     if not authorization.startswith("Bearer "):
+        print("[AUTH] Invalid authorization format!")
         raise HTTPException(
             status_code=401,
             detail={
@@ -51,9 +56,12 @@ def get_current_user(authorization: str = Header(None)):
         )
 
     token = authorization.replace("Bearer ", "")
+    print(f"[AUTH] Token (first 50 chars): {token[:50]}...")
 
     try:
         decoded_token = auth.verify_id_token(token)
+        print(f"[AUTH] Token verified successfully")
+        print(f"[AUTH] Decoded token UID: {decoded_token.get('uid')}")
         return {
             "uid": decoded_token.get("uid"),
             "email": decoded_token.get("email"),
@@ -61,7 +69,8 @@ def get_current_user(authorization: str = Header(None)):
             "picture": decoded_token.get("picture")
         }
 
-    except Exception:
+    except Exception as e:
+        print(f"[AUTH] Token verification failed: {e}")
         raise HTTPException(
             status_code=401,
             detail={
