@@ -887,8 +887,7 @@ async function uploadPDF() {
 
       // Clear previous messages and show success
       clearMessages();
-      addMessage(`Document "${data.original_filename}" has been processed successfully.`, false);
-      addMessage(`Extracted ${data.total_characters.toLocaleString()} characters. You can now ask questions or generate study materials.`, false);
+      addMessage(`Document "${data.original_filename}" has been processed successfully. Extracted ${data.total_characters.toLocaleString()} characters. You can now ask questions or generate study materials.`, false);
 
       // Hide progress after delay
       setTimeout(() => {
@@ -1003,8 +1002,7 @@ async function generateViva() {
       throw new Error(getErrorMessage(data));
     }
 
-    addMessage(`📚 **Viva Questions** (${count} questions)\n\n`, false);
-    addMessage(data.output || 'Questions generated successfully.', false);
+    addMessage(`📚 **Viva Questions** (${count} questions)\n\n${data.output || 'Questions generated successfully.'}`, false);
     showToast('Viva questions generated!', 'success');
 
   } catch (error) {
@@ -1054,8 +1052,7 @@ async function generateExam() {
       throw new Error(getErrorMessage(data));
     }
 
-    addMessage(`📝 **Exam Questions** (${count} questions)\n\n`, false);
-    addMessage(data.output || 'Questions generated successfully.', false);
+    addMessage(`📝 **Exam Questions** (${count} questions)\n\n${data.output || 'Questions generated successfully.'}`, false);
     showToast('Exam questions generated!', 'success');
 
   } catch (error) {
