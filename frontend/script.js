@@ -907,7 +907,7 @@ async function uploadPDF() {
 }
 
 // ============================================================================
-// Ask PDF
+// Ask PDF using RAG
 // ============================================================================
 async function askPDF() {
   if (!currentTextFile) {
@@ -932,15 +932,16 @@ async function askPDF() {
   showTypingIndicator();
 
   try {
-    const response = await fetch(`${API_BASE_URL}/ask-pdf`, {
+    // Use RAG endpoint for semantic retrieval
+    const response = await fetch(`${API_BASE_URL}/ask-rag`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...authHeaders
       },
       body: JSON.stringify({
-        text_file: currentTextFile,
-        question: question
+        question: question,
+        document_ids: null  // Search all user documents
       })
     });
 
@@ -952,7 +953,13 @@ async function askPDF() {
       throw new Error(getErrorMessage(data));
     }
 
-    addMessage(data.answer || 'I could not find an answer in the document.', false, true);  // Save AI response
+    // Add the answer (RAG response includes sources, but we just display the answer for now)
+    addMessage(data.answer || 'I could not find an answer in the document.', false, true);
+
+    // Log sources for debugging (optional - can be used for source attribution UI later)
+    if (data.sources && data.sources.length > 0) {
+      console.log('[RAG] Source references:', data.sources);
+    }
 
   } catch (error) {
     hideTypingIndicator();

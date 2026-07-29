@@ -6,8 +6,10 @@ from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Response, Request
 from pydantic import BaseModel, Field
 from question_utils import generate_viva_questions, generate_exam_questions
-from pdf_utils import extract_text_from_pdf
+from pdf_service import extract_text_from_pdf_legacy, PDFProcessingError
 from ai_utils import generate_ai_response
+from rag_service import process_and_index_document, generate_rag_answer, retrieve_relevant_chunks
+from vector_store import get_user_documents, delete_document_chunks, get_collection_stats
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -110,7 +112,7 @@ MAX_PDF_SIZE_MB = 5
 MAX_PDF_SIZE_BYTES = MAX_PDF_SIZE_MB * 1024 * 1024
 
 MAX_QUESTIONS = 10
-MAX_AI_TEXT_CHARS = 3000
+MAX_AI_TEXT_CHARS = 10000
 
 
 class ChatRequest(BaseModel):
@@ -127,6 +129,10 @@ class AskPDFRequest(BaseModel):
     text_file: str
     question: str
 
+class AskRAGRequest(BaseModel):
+    question: str
+    document_ids: list[str] | None = None  # Optional filter for specific documents
+
 class CreateConversationRequest(BaseModel):
     title: str = "New Chat"
     document_id: str | None = None
@@ -138,6 +144,20 @@ class UpdateConversationRequest(BaseModel):
 class AddMessageRequest(BaseModel):
     role: str  # "user" or "assistant"
     content: str
+
+# RAG-specific response models
+class SourceReference(BaseModel):
+    text: str
+    page_number: int
+    chunk_id: str
+    filename: str
+    similarity: float
+
+class RAGAnswerResponse(BaseModel):
+    status: str
+    answer: str
+    sources: list[SourceReference]
+    question: str
 
 @app.get("/health")
 def health_check():
@@ -216,7 +236,7 @@ def chat(request: ChatRequest):
 
 
 @app.post("/upload-pdf")
-async def upload_pdf(file: UploadFile = File(...),current_user: dict = Depends(get_current_user)):
+async def upload_pdf(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
     if not file.filename:
         raise HTTPException(
             status_code=400,
@@ -239,44 +259,82 @@ async def upload_pdf(file: UploadFile = File(...),current_user: dict = Depends(g
     with open(file_path, "wb") as buffer:
         buffer.write(file_content)
 
-    extracted_text = extract_text_from_pdf(file_path)
+    user_id = current_user.get("uid")
 
-    if not extracted_text or extracted_text.startswith("Error reading PDF"):
-        raise HTTPException(
-            status_code=400,
-            detail=create_error_response(
-                "Could not extract text from this PDF.",
-                "The PDF may be scanned, image-based, encrypted, or corrupted."
-            )
+    try:
+        # Process PDF with RAG pipeline (extract text, chunk, embed, store)
+        rag_result = process_and_index_document(
+            file_path=file_path,
+            user_id=user_id,
+            filename=file.filename
         )
 
-    text_filename = safe_pdf_filename.replace(".pdf", ".txt")
-    text_path = os.path.join(UPLOAD_DIR, text_filename)
+        if rag_result["status"] == "error":
+            # Clean up the uploaded file
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            raise HTTPException(
+                status_code=400,
+                detail=create_error_response(rag_result["message"])
+            )
 
-    with open(text_path, "w", encoding="utf-8") as text_file:
-        text_file.write(extracted_text)
-    log_usage(
-    current_user,
-    "upload_pdf",
-    {
-        "original_filename": file.filename,
-        "saved_pdf": safe_pdf_filename,
-        "text_file": text_filename,
-        "file_size_mb": round(len(file_content) / (1024 * 1024), 2),
-        "total_characters": len(extracted_text),
-    }
-)
-    return {
-        
-        "status": "success",
-        "original_filename": file.filename,
-        "saved_pdf": safe_pdf_filename,
-        "text_file": text_filename,
-        "message": "PDF uploaded and text extracted successfully.",
-        "text_preview": extracted_text[:1000],
-        "total_characters": len(extracted_text),
-        "file_size_mb": round(len(file_content) / (1024 * 1024), 2)
-    }
+        # For backward compatibility, also extract text to .txt file
+        try:
+            extracted_text = extract_text_from_pdf_legacy(file_path)
+            text_filename = safe_pdf_filename.replace(".pdf", ".txt")
+            text_path = os.path.join(UPLOAD_DIR, text_filename)
+            with open(text_path, "w", encoding="utf-8") as text_file:
+                text_file.write(extracted_text)
+        except Exception as e:
+            print(f"[BACKEND] Warning: Could not create text file: {e}")
+            extracted_text = ""
+            text_filename = ""
+
+        log_usage(
+            current_user,
+            "upload_pdf",
+            {
+                "original_filename": file.filename,
+                "saved_pdf": safe_pdf_filename,
+                "text_file": text_filename,
+                "file_size_mb": round(len(file_content) / (1024 * 1024), 2),
+                "total_characters": rag_result.get("total_characters", 0),
+                "chunk_count": rag_result.get("chunk_count", 0),
+                "document_id": rag_result.get("document_id"),
+                "is_duplicate": rag_result.get("is_duplicate", False)
+            }
+        )
+
+        response_data = {
+            "status": "success",
+            "original_filename": file.filename,
+            "saved_pdf": safe_pdf_filename,
+            "text_file": text_filename,
+            "document_id": rag_result.get("document_id"),
+            "message": "PDF uploaded and processed successfully.",
+            "text_preview": extracted_text[:1000] if extracted_text else "",
+            "total_characters": rag_result.get("total_characters", 0),
+            "file_size_mb": round(len(file_content) / (1024 * 1024), 2)
+        }
+
+        # Add duplicate info if applicable
+        if rag_result.get("is_duplicate"):
+            response_data["is_duplicate"] = True
+            response_data["message"] = "Document already exists. Using existing embeddings."
+
+        return response_data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Clean up on error
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        print(f"[BACKEND] Upload error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=create_error_response(f"Failed to process PDF: {str(e)}")
+        )
 
 
 @app.post("/generate-viva")
@@ -419,7 +477,11 @@ Study notes:
     }
 
 @app.post("/ask-pdf")
-def ask_pdf(request: AskPDFRequest,  current_user: dict = Depends(get_current_user)):
+def ask_pdf(request: AskPDFRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Legacy endpoint for backward compatibility.
+    Uses the old method of reading entire text file.
+    """
     text_path = get_text_path(request.text_file)
 
     if not os.path.exists(text_path):
@@ -465,6 +527,112 @@ User question:
         "text_file": request.text_file,
         "question": request.question,
         "answer": ai_output
+    }
+
+
+@app.post("/ask-rag")
+def ask_rag(request: AskRAGRequest, current_user: dict = Depends(get_current_user)):
+    """
+    RAG-powered question answering endpoint.
+    Uses semantic retrieval to find relevant chunks before generating answer.
+    """
+    user_id = current_user.get("uid")
+
+    if not request.question or not request.question.strip():
+        return {
+            "status": "error",
+            "message": "Question cannot be empty."
+        }
+
+    # Generate answer using RAG pipeline
+    rag_response = generate_rag_answer(
+        question=request.question,
+        user_id=user_id,
+        document_ids=request.document_ids
+    )
+
+    # Format sources for response
+    sources = [
+        {
+            "text": source.text,
+            "page_number": source.page_number,
+            "chunk_id": source.chunk_id,
+            "filename": source.filename,
+            "similarity": source.similarity
+        }
+        for source in rag_response.sources
+    ]
+
+    log_usage(
+        current_user,
+        "ask_rag",
+        {
+            "question": request.question,
+            "document_ids": request.document_ids,
+            "sources_count": len(sources),
+            "context_chars": len(rag_response.context_used)
+        }
+    )
+
+    return {
+        "status": "success",
+        "answer": rag_response.answer,
+        "sources": sources,
+        "question": request.question
+    }
+
+
+@app.get("/documents")
+def list_documents(current_user: dict = Depends(get_current_user)):
+    """
+    List all indexed documents for the current user.
+    """
+    user_id = current_user.get("uid")
+
+    documents = get_user_documents(user_id)
+
+    return {
+        "status": "success",
+        "documents": documents
+    }
+
+
+@app.delete("/documents/{document_id}")
+def delete_document_endpoint(document_id: str, current_user: dict = Depends(get_current_user)):
+    """
+    Delete a document and its embeddings from the vector store.
+    """
+    user_id = current_user.get("uid")
+
+    success = delete_document_chunks(document_id, user_id)
+
+    if success:
+        log_usage(
+            current_user,
+            "delete_document",
+            {"document_id": document_id}
+        )
+        return {
+            "status": "success",
+            "message": "Document deleted successfully"
+        }
+    else:
+        return {
+            "status": "error",
+            "message": "Failed to delete document"
+        }
+
+
+@app.get("/vector-stats")
+def get_vector_stats(current_user: dict = Depends(get_current_user)):
+    """
+    Get statistics about the vector store.
+    Admin/debug endpoint.
+    """
+    stats = get_collection_stats()
+    return {
+        "status": "success",
+        "stats": stats
     }
 
 
