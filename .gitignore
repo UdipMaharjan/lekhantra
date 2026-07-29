@@ -16,6 +16,7 @@ backend/.env
 
 # Uploaded user files
 backend/uploads/
+backend/chroma_db/
 uploads/
 
 # Editor / OS
