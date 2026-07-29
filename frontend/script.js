@@ -81,6 +81,20 @@ const elements = {
   userGreeting: document.getElementById('userGreeting'),
   userAvatar: document.getElementById('userAvatar'),
   openAuthBtn: document.getElementById('openAuthBtn'),
+
+  // Profile Modal
+  profileModal: document.getElementById('profileModal'),
+  profileCloseBtn: document.getElementById('profileCloseBtn'),
+  profileAvatarImg: document.getElementById('profileAvatarImg'),
+  profileDisplayName: document.getElementById('profileDisplayName'),
+  profileEmail: document.getElementById('profileEmail'),
+  profileProvider: document.getElementById('profileProvider'),
+  profileEmailField: document.getElementById('profileEmailField'),
+  profileMemberSince: document.getElementById('profileMemberSince'),
+  editDisplayName: document.getElementById('editDisplayName'),
+  saveDisplayNameBtn: document.getElementById('saveDisplayNameBtn'),
+  profileDocumentsList: document.getElementById('profileDocumentsList'),
+  showSourcesToggle: document.getElementById('showSourcesToggle'),
 };
 
 // ============================================================================
@@ -1346,6 +1360,427 @@ function initKeyboardShortcuts() {
 }
 
 // ============================================================================
+// Profile Management
+// ============================================================================
+
+let currentProfileData = null;
+
+async function openProfileModal() {
+  if (!elements.profileModal) return;
+
+  elements.profileModal.classList.remove('hidden');
+  await loadProfileData();
+  await loadDocumentsList();
+}
+
+function closeProfileModal() {
+  if (!elements.profileModal) return;
+  elements.profileModal.classList.add('hidden');
+}
+
+async function loadProfileData() {
+  const authHeaders = getAuthHeaders();
+  if (!authHeaders) return;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/profile`, {
+      method: 'GET',
+      headers: authHeaders
+    });
+
+    if (!response.ok) throw new Error('Failed to load profile');
+
+    const data = await response.json();
+
+    if (data.status === 'success') {
+      currentProfileData = data;
+
+      // Update profile header
+      if (elements.profileDisplayName) {
+        elements.profileDisplayName.textContent = data.profile.display_name || 'User';
+      }
+      if (elements.profileEmail) {
+        elements.profileEmail.textContent = data.profile.email || '';
+      }
+      if (elements.profileProvider) {
+        elements.profileProvider.textContent = data.profile.provider || 'Email';
+      }
+      if (elements.profileEmailField) {
+        elements.profileEmailField.value = data.profile.email || '';
+      }
+      if (elements.editDisplayName) {
+        elements.editDisplayName.value = data.profile.display_name || '';
+      }
+      if (elements.profileAvatarImg && data.profile.photo_url) {
+        elements.profileAvatarImg.src = data.profile.photo_url;
+      }
+
+      // Format member since
+      if (data.profile.member_since && elements.profileMemberSince) {
+        const date = new Date(data.profile.member_since);
+        elements.profileMemberSince.value = date.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+      }
+
+      // Update statistics
+      if (data.statistics) {
+        document.getElementById('statDocuments').textContent = data.statistics.documents_uploaded || 0;
+        document.getElementById('statConversations').textContent = data.statistics.conversations_created || 0;
+        document.getElementById('statQuestions').textContent = data.statistics.questions_asked || 0;
+        document.getElementById('statResponses').textContent = data.statistics.ai_responses || 0;
+        document.getElementById('statStorage').textContent = `${data.statistics.storage_used_mb || 0} MB`;
+
+        const lastUpload = data.statistics.last_upload_date;
+        document.getElementById('statLastUpload').textContent = lastUpload
+          ? new Date(lastUpload).toLocaleDateString()
+          : 'Never';
+      }
+
+      // Update preferences
+      if (data.preferences) {
+        updatePreferenceUI('response_style', data.preferences.response_style || 'balanced');
+        updatePreferenceUI('retrieval_depth', String(data.preferences.retrieval_depth || '5'));
+        if (elements.showSourcesToggle) {
+          elements.showSourcesToggle.checked = data.preferences.show_sources !== false;
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error loading profile:', error);
+    showToast('Failed to load profile data', 'error');
+  }
+}
+
+function updatePreferenceUI(prefType, value) {
+  const buttons = document.querySelectorAll(`[data-pref="${prefType}"]`);
+  buttons.forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.value === value);
+  });
+}
+
+async function loadDocumentsList() {
+  const authHeaders = getAuthHeaders();
+  if (!authHeaders) return;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/profile/documents`, {
+      method: 'GET',
+      headers: authHeaders
+    });
+
+    if (!response.ok) throw new Error('Failed to load documents');
+
+    const data = await response.json();
+
+    if (data.status === 'success' && data.documents) {
+      renderProfileDocuments(data.documents);
+    }
+  } catch (error) {
+    console.error('Error loading documents:', error);
+  }
+}
+
+function renderProfileDocuments(documents) {
+  const container = elements.profileDocumentsList;
+  if (!container) return;
+
+  if (!documents || documents.length === 0) {
+    container.innerHTML = `
+      <div class="empty-documents">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+        </svg>
+        <p>No documents uploaded yet</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = documents.map(doc => `
+    <div class="document-item" data-doc-id="${doc.document_id}">
+      <div class="document-item-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+        </svg>
+      </div>
+      <div class="document-item-info">
+        <span class="document-item-name">${escapeHtml(doc.filename || 'Unknown')}</span>
+        <span class="document-item-meta">${doc.chunk_count || 0} chunks</span>
+      </div>
+      <div class="document-item-actions">
+        <button onclick="deleteProfileDocument('${doc.document_id}')" class="delete" title="Delete">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function saveDisplayName() {
+  const authHeaders = getAuthHeaders();
+  if (!authHeaders) return;
+
+  const newName = elements.editDisplayName?.value.trim();
+  if (!newName) return;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/profile`, {
+      method: 'PUT',
+      headers: {
+        ...authHeaders,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ display_name: newName })
+    });
+
+    if (!response.ok) throw new Error('Failed to save');
+
+    if (elements.profileDisplayName) {
+      elements.profileDisplayName.textContent = newName;
+    }
+
+    showToast('Display name updated', 'success');
+  } catch (error) {
+    console.error('Error saving display name:', error);
+    showToast('Failed to update display name', 'error');
+  }
+}
+
+async function savePreference(prefType, value) {
+  const authHeaders = getAuthHeaders();
+  if (!authHeaders) return;
+
+  try {
+    const body = {};
+    if (prefType === 'response_style') {
+      body.response_style = value;
+    } else if (prefType === 'retrieval_depth') {
+      body.retrieval_depth = parseInt(value);
+    } else if (prefType === 'show_sources') {
+      body.show_sources = value;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/profile/preferences`, {
+      method: 'PUT',
+      headers: {
+        ...authHeaders,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) throw new Error('Failed to save preference');
+
+    updatePreferenceUI(prefType, value);
+    showToast('Preference saved', 'success');
+  } catch (error) {
+    console.error('Error saving preference:', error);
+    showToast('Failed to save preference', 'error');
+  }
+}
+
+async function deleteProfileDocument(docId) {
+  if (!confirm('Are you sure you want to delete this document? This cannot be undone.')) {
+    return;
+  }
+
+  const authHeaders = getAuthHeaders();
+  if (!authHeaders) return;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/profile/documents/${docId}`, {
+      method: 'DELETE',
+      headers: authHeaders
+    });
+
+    if (!response.ok) throw new Error('Failed to delete');
+
+    // Remove from UI
+    const docElement = document.querySelector(`[data-doc-id="${docId}"]`);
+    if (docElement) {
+      docElement.remove();
+    }
+
+    // Reload to refresh stats
+    await loadProfileData();
+    await loadDocumentsList();
+
+    showToast('Document deleted', 'success');
+  } catch (error) {
+    console.error('Error deleting document:', error);
+    showToast('Failed to delete document', 'error');
+  }
+}
+
+async function exportUserData() {
+  const authHeaders = getAuthHeaders();
+  if (!authHeaders) return;
+
+  showToast('Preparing export...', 'info');
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/profile/export`, {
+      method: 'GET',
+      headers: authHeaders
+    });
+
+    if (!response.ok) throw new Error('Failed to export');
+
+    const data = await response.json();
+
+    if (data.status === 'success') {
+      // Download as JSON file
+      const blob = new Blob([JSON.stringify(data.export, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `lekhantra-export-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      showToast('Data exported successfully', 'success');
+    }
+  } catch (error) {
+    console.error('Error exporting data:', error);
+    showToast('Failed to export data', 'error');
+  }
+}
+
+async function deleteAllConversations() {
+  if (!confirm('Are you sure you want to delete ALL conversations? This cannot be undone.')) {
+    return;
+  }
+
+  if (!confirm('This will permanently delete all your chat history. Continue?')) {
+    return;
+  }
+
+  const authHeaders = getAuthHeaders();
+  if (!authHeaders) return;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/profile/conversations`, {
+      method: 'DELETE',
+      headers: authHeaders
+    });
+
+    if (!response.ok) throw new Error('Failed to delete');
+
+    await loadProfileData();
+    await loadConversations();
+
+    showToast('All conversations deleted', 'success');
+  } catch (error) {
+    console.error('Error deleting conversations:', error);
+    showToast('Failed to delete conversations', 'error');
+  }
+}
+
+async function deleteAllDocuments() {
+  if (!confirm('Are you sure you want to delete ALL documents? This cannot be undone.')) {
+    return;
+  }
+
+  if (!confirm('This will permanently delete all uploaded PDFs and embeddings. Continue?')) {
+    return;
+  }
+
+  const authHeaders = getAuthHeaders();
+  if (!authHeaders) return;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/profile/documents`, {
+      method: 'DELETE',
+      headers: authHeaders
+    });
+
+    if (!response.ok) throw new Error('Failed to delete');
+
+    await loadProfileData();
+    await loadDocumentsList();
+
+    // Clear current document
+    currentTextFile = null;
+    clearMessages();
+
+    showToast('All documents deleted', 'success');
+  } catch (error) {
+    console.error('Error deleting documents:', error);
+    showToast('Failed to delete documents', 'error');
+  }
+}
+
+function initProfileModal() {
+  // Close button
+  if (elements.profileCloseBtn) {
+    elements.profileCloseBtn.addEventListener('click', closeProfileModal);
+  }
+
+  // Click outside to close
+  if (elements.profileModal) {
+    elements.profileModal.addEventListener('click', (e) => {
+      if (e.target === elements.profileModal) {
+        closeProfileModal();
+      }
+    });
+  }
+
+  // Save display name
+  if (elements.saveDisplayNameBtn) {
+    elements.saveDisplayNameBtn.addEventListener('click', saveDisplayName);
+  }
+
+  // Profile tabs
+  document.querySelectorAll('.profile-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const tabName = tab.dataset.tab;
+
+      // Update tab buttons
+      document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      // Update tab content
+      document.querySelectorAll('.profile-tab-content').forEach(content => {
+        content.classList.remove('active');
+      });
+      document.getElementById(`tab-${tabName}`)?.classList.add('active');
+    });
+  });
+
+  // Preference buttons
+  document.querySelectorAll('.preference-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      savePreference(btn.dataset.pref, btn.dataset.value);
+    });
+  });
+
+  // Show sources toggle
+  if (elements.showSourcesToggle) {
+    elements.showSourcesToggle.addEventListener('change', (e) => {
+      savePreference('show_sources', e.target.checked);
+    });
+  }
+
+  // Privacy buttons
+  document.getElementById('exportDataBtn')?.addEventListener('click', exportUserData);
+  document.getElementById('deleteAllConversationsBtn')?.addEventListener('click', deleteAllConversations);
+  document.getElementById('deleteAllDocumentsBtn')?.addEventListener('click', deleteAllDocuments);
+  document.getElementById('deleteAccountBtn')?.addEventListener('click', () => {
+    showToast('Please contact support to delete your account', 'info');
+  });
+
+  // Settings link is now in HTML as a link to profile.html
+}
+
+// ============================================================================
 // Initialize
 // ============================================================================
 document.addEventListener('DOMContentLoaded', () => {
@@ -1355,6 +1790,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDragDrop();
   initKeyboardShortcuts();
   initSuggestedPrompts();
+  initProfileModal();
 
   // Set initial state
   if (elements.generateVivaBtn) elements.generateVivaBtn.disabled = true;

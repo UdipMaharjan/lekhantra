@@ -159,6 +159,16 @@ class RAGAnswerResponse(BaseModel):
     sources: list[SourceReference]
     question: str
 
+# Profile Management Models
+class UpdateProfileRequest(BaseModel):
+    display_name: str | None = None
+    photo_url: str | None = None
+
+class UpdatePreferencesRequest(BaseModel):
+    response_style: str | None = None  # "concise", "balanced", "detailed"
+    retrieval_depth: int | None = None  # 3, 5, or 10
+    show_sources: bool | None = None
+
 @app.get("/health")
 def health_check():
     return {
@@ -919,6 +929,473 @@ def get_usage_logs(current_user: dict = Depends(get_current_user)):
         "status": "success",
         "logs": logs
     }
+
+
+# =============================================================================
+# PROFILE MANAGEMENT ENDPOINTS
+# =============================================================================
+
+def get_user_preferences_document(db, uid):
+    """Get or create user preferences document."""
+    prefs_ref = db.collection("user_preferences").document(uid)
+    prefs_doc = prefs_ref.get()
+
+    if not prefs_doc.exists:
+        # Create default preferences
+        prefs_ref.set({
+            "response_style": "balanced",
+            "retrieval_depth": 5,
+            "show_sources": True,
+            "created_at": datetime.now(),
+            "updated_at": datetime.now()
+        })
+        return prefs_ref.get()
+    return prefs_doc
+
+
+def calculate_real_stats(db, uid):
+    """
+    Calculate real statistics by querying actual data from Firestore.
+    """
+    stats = {
+        "documents_uploaded": 0,
+        "conversations_created": 0,
+        "questions_asked": 0,
+        "ai_responses": 0,
+        "storage_used_bytes": 0,
+        "last_upload_date": None,
+    }
+
+    # Count conversations
+    try:
+        convs_ref = db.collection("conversations").where("user_id", "==", uid).where("is_deleted", "==", False)
+        stats["conversations_created"] = sum(1 for _ in convs_ref.stream())
+    except Exception as e:
+        print(f"[STATS] Error counting conversations: {e}")
+
+    # Count documents from ChromaDB
+    try:
+        chroma_docs = get_user_documents(uid)
+        stats["documents_uploaded"] = len(chroma_docs)
+
+        # Estimate storage: 50KB per document average
+        stats["storage_used_bytes"] = len(chroma_docs) * 50 * 1024
+
+        # Get last upload date from user_stats if available
+        stats_ref = db.collection("user_stats").document(uid).get()
+        if stats_ref.exists:
+            stats_data = stats_ref.to_dict()
+            stats["last_upload_date"] = stats_data.get("last_upload_date")
+            # Use stored storage if more accurate
+            if stats_data.get("storage_used_bytes"):
+                stats["storage_used_bytes"] = stats_data.get("storage_used_bytes")
+    except Exception as e:
+        print(f"[STATS] Error getting documents: {e}")
+
+    # Count messages (questions + responses)
+    try:
+        # Get all conversations and count their messages
+        convs_ref = db.collection("conversations").where("user_id", "==", uid)
+        for conv_doc in convs_ref.stream():
+            messages_ref = db.collection("conversations").document(conv_doc.id).collection("messages")
+            for msg_doc in messages_ref.stream():
+                role = msg_doc.to_dict().get("role")
+                if role == "user":
+                    stats["questions_asked"] += 1
+                elif role == "assistant":
+                    stats["ai_responses"] += 1
+    except Exception as e:
+        print(f"[STATS] Error counting messages: {e}")
+
+    return stats
+
+
+@app.get("/profile")
+def get_profile(current_user: dict = Depends(get_current_user)):
+    """Get user profile information with real calculated statistics."""
+    db = get_firestore_client()
+    uid = current_user.get("uid")
+
+    # Get user info from Firebase Auth (from token)
+    profile_data = {
+        "uid": uid,
+        "email": current_user.get("email", ""),
+        "display_name": current_user.get("name", current_user.get("email", "").split("@")[0]),
+        "photo_url": current_user.get("picture", ""),
+        "provider": current_user.get("provider", "email"),
+        "email_verified": current_user.get("email_verified", False)
+    }
+
+    # Calculate real stats from actual data
+    stats_data = calculate_real_stats(db, uid)
+
+    # Get preferences
+    prefs_doc = get_user_preferences_document(db, uid)
+    prefs_data = prefs_doc.to_dict()
+
+    # Calculate storage MB
+    storage_bytes = stats_data.get("storage_used_bytes", 0)
+    storage_mb = round(storage_bytes / (1024 * 1024), 2)
+
+    return {
+        "status": "success",
+        "profile": {
+            "uid": profile_data["uid"],
+            "email": profile_data["email"],
+            "display_name": profile_data["display_name"],
+            "photo_url": profile_data["photo_url"],
+            "provider": profile_data["provider"],
+            "email_verified": profile_data["email_verified"],
+            "member_since": current_user.get("user_id_creation_timestamp", None)
+        },
+        "statistics": {
+            "documents_uploaded": stats_data.get("documents_uploaded", 0),
+            "conversations_created": stats_data.get("conversations_created", 0),
+            "questions_asked": stats_data.get("questions_asked", 0),
+            "ai_responses": stats_data.get("ai_responses", 0),
+            "storage_used_mb": storage_mb,
+            "storage_used_bytes": storage_bytes,
+            "last_upload_date": stats_data.get("last_upload_date").isoformat() if stats_data.get("last_upload_date") else None
+        },
+        "preferences": {
+            "response_style": prefs_data.get("response_style", "balanced"),
+            "retrieval_depth": prefs_data.get("retrieval_depth", 5),
+            "show_sources": prefs_data.get("show_sources", True)
+        }
+    }
+
+
+@app.put("/profile")
+def update_profile(request: UpdateProfileRequest, current_user: dict = Depends(get_current_user)):
+    """Update user profile (display name, photo URL)."""
+    db = get_firestore_client()
+    uid = current_user.get("uid")
+
+    # Note: Full profile updates require Firebase Admin SDK user management
+    # For now, we store display preferences in Firestore
+    prefs_ref = db.collection("user_preferences").document(uid)
+    prefs_doc = prefs_ref.get()
+
+    update_data = {"updated_at": datetime.now()}
+    if request.display_name is not None:
+        update_data["display_name"] = request.display_name
+    if request.photo_url is not None:
+        update_data["photo_url"] = request.photo_url
+
+    prefs_ref.set(update_data, merge=True)
+
+    return {
+        "status": "success",
+        "message": "Profile updated successfully"
+    }
+
+
+@app.get("/profile/documents")
+def get_profile_documents(current_user: dict = Depends(get_current_user)):
+    """Get all documents uploaded by the user."""
+    user_id = current_user.get("uid")
+
+    # Get documents from vector store
+    documents = get_user_documents(user_id)
+
+    return {
+        "status": "success",
+        "documents": documents
+    }
+
+
+@app.delete("/profile/documents/{document_id}")
+def delete_profile_document(document_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a document from user's library."""
+    user_id = current_user.get("uid")
+
+    # Delete from vector store
+    success = delete_document_chunks(document_id, user_id)
+
+    if success:
+        # Update storage in user_stats
+        db = get_firestore_client()
+        stats_ref = db.collection("user_stats").document(user_id)
+        stats_doc = stats_ref.get()
+
+        if stats_doc.exists:
+            stats_data = stats_doc.to_dict()
+            new_storage = max(0, stats_data.get("storage_used_bytes", 0) - (50 * 1024))
+            stats_ref.update({
+                "storage_used_bytes": new_storage,
+                "updated_at": datetime.now()
+            })
+
+        return {
+            "status": "success",
+            "message": "Document deleted successfully"
+        }
+    else:
+        return {
+            "status": "error",
+            "message": "Failed to delete document"
+        }
+
+
+@app.post("/documents/{document_id}/reindex")
+def reindex_document(document_id: str, current_user: dict = Depends(get_current_user)):
+    """
+    Re-index a document by deleting and regenerating its embeddings.
+    Note: This requires the original PDF file to be available.
+    For now, we just confirm the document exists in ChromaDB.
+    """
+    user_id = current_user.get("uid")
+
+    # Check if document exists
+    chunks = get_document_chunks(document_id, user_id)
+
+    if not chunks:
+        return {
+            "status": "error",
+            "message": "Document not found"
+        }
+
+    # In a full implementation, we would:
+    # 1. Look up the original PDF file path from a document metadata store
+    # 2. Re-process the PDF and regenerate embeddings
+    # For now, return success as the document is already indexed
+    return {
+        "status": "success",
+        "message": "Document is already indexed",
+        "chunk_count": len(chunks)
+    }
+
+
+@app.get("/profile/preferences")
+def get_profile_preferences(current_user: dict = Depends(get_current_user)):
+    """Get user preferences."""
+    db = get_firestore_client()
+    uid = current_user.get("uid")
+
+    prefs_doc = get_user_preferences_document(db, uid)
+    prefs_data = prefs_doc.to_dict()
+
+    return {
+        "status": "success",
+        "preferences": {
+            "response_style": prefs_data.get("response_style", "balanced"),
+            "retrieval_depth": prefs_data.get("retrieval_depth", 5),
+            "show_sources": prefs_data.get("show_sources", True)
+        }
+    }
+
+
+@app.put("/profile/preferences")
+def update_profile_preferences(request: UpdatePreferencesRequest, current_user: dict = Depends(get_current_user)):
+    """Update user preferences."""
+    db = get_firestore_client()
+    uid = current_user.get("uid")
+
+    update_data = {"updated_at": datetime.now()}
+
+    if request.response_style is not None:
+        if request.response_style not in ["concise", "balanced", "detailed"]:
+            raise HTTPException(status_code=400, detail={"status": "error", "message": "Invalid response style"})
+        update_data["response_style"] = request.response_style
+
+    if request.retrieval_depth is not None:
+        if request.retrieval_depth not in [3, 5, 10]:
+            raise HTTPException(status_code=400, detail={"status": "error", "message": "Invalid retrieval depth"})
+        update_data["retrieval_depth"] = request.retrieval_depth
+
+    if request.show_sources is not None:
+        update_data["show_sources"] = request.show_sources
+
+    prefs_ref = db.collection("user_preferences").document(uid)
+    prefs_ref.update(update_data)
+
+    return {
+        "status": "success",
+        "message": "Preferences updated successfully"
+    }
+
+
+@app.get("/profile/export")
+def export_user_data(current_user: dict = Depends(get_current_user)):
+    """Export all user data (conversations and messages)."""
+    db = get_firestore_client()
+    uid = current_user.get("uid")
+
+    # Get all conversations
+    conversations_ref = db.collection("conversations").where("user_id", "==", uid)
+    conversations = []
+
+    for conv_doc in conversations_ref.stream():
+        conv_data = conv_doc.to_dict()
+
+        # Get messages for this conversation
+        messages_ref = db.collection("conversations").document(conv_doc.id).collection("messages")
+        messages = []
+
+        for msg_doc in messages_ref.stream():
+            msg_data = msg_doc.to_dict()
+            messages.append({
+                "id": msg_doc.id,
+                "role": msg_data.get("role"),
+                "content": msg_data.get("content"),
+                "created_at": msg_data.get("created_at").isoformat() if msg_data.get("created_at") else None
+            })
+
+        conversations.append({
+            "id": conv_doc.id,
+            "title": conv_data.get("title"),
+            "created_at": conv_data.get("created_at").isoformat() if conv_data.get("created_at") else None,
+            "updated_at": conv_data.get("updated_at").isoformat() if conv_data.get("updated_at") else None,
+            "messages": messages
+        })
+
+    # Get user stats
+    stats_doc = get_user_stats_document(db, uid)
+    stats_data = stats_doc.to_dict()
+
+    return {
+        "status": "success",
+        "export": {
+            "exported_at": datetime.now().isoformat(),
+            "user_id": uid,
+            "statistics": {
+                "documents_uploaded": stats_data.get("documents_uploaded", 0),
+                "conversations_created": stats_data.get("conversations_created", 0),
+                "questions_asked": stats_data.get("questions_asked", 0),
+                "ai_responses": stats_data.get("ai_responses", 0)
+            },
+            "conversations": conversations
+        }
+    }
+
+
+@app.delete("/profile/conversations")
+def delete_all_conversations(current_user: dict = Depends(get_current_user)):
+    """Delete all user conversations."""
+    db = get_firestore_client()
+    uid = current_user.get("uid")
+
+    # Get all conversations
+    conversations_ref = db.collection("conversations").where("user_id", "==", uid)
+
+    deleted_count = 0
+    for conv_doc in conversations_ref.stream():
+        conv_doc.reference.update({
+            "is_deleted": True,
+            "updated_at": datetime.now()
+        })
+        deleted_count += 1
+
+    # Update stats
+    stats_ref = db.collection("user_stats").document(uid)
+    stats_ref.update({
+        "conversations_created": 0,
+        "questions_asked": 0,
+        "ai_responses": 0,
+        "updated_at": datetime.now()
+    })
+
+    return {
+        "status": "success",
+        "message": f"Deleted {deleted_count} conversations"
+    }
+
+
+@app.delete("/profile/documents")
+def delete_all_documents(current_user: dict = Depends(get_current_user)):
+    """Delete all user documents."""
+    user_id = current_user.get("uid")
+
+    # Get all document IDs
+    documents = get_user_documents(user_id)
+
+    deleted_count = 0
+    for doc in documents:
+        doc_id = doc.get("document_id")
+        if doc_id:
+            success = delete_document_chunks(doc_id, user_id)
+            if success:
+                deleted_count += 1
+
+    # Update stats
+    db = get_firestore_client()
+    stats_ref = db.collection("user_stats").document(user_id)
+    stats_ref.update({
+        "documents_uploaded": 0,
+        "storage_used_bytes": 0,
+        "last_upload_date": None,
+        "updated_at": datetime.now()
+    })
+
+    return {
+        "status": "success",
+        "message": f"Deleted {deleted_count} documents"
+    }
+
+
+# =============================================================================
+# STATS INCREMENT ENDPOINTS (called by frontend automatically)
+# =============================================================================
+
+class IncrementStatRequest(BaseModel):
+    stat: str
+    value: int = 1
+
+@app.post("/stats/increment")
+def increment_stat(request: IncrementStatRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Increment a user statistic.
+    Called automatically by frontend after actions.
+    """
+    db = get_firestore_client()
+    uid = current_user.get("uid")
+
+    valid_stats = [
+        "documents_uploaded",
+        "conversations_created",
+        "questions_asked",
+        "ai_responses",
+        "storage_used_bytes"
+    ]
+
+    if request.stat not in valid_stats:
+        raise HTTPException(status_code=400, detail={"status": "error", "message": f"Invalid stat: {request.stat}"})
+
+    stats_ref = db.collection("user_stats").document(uid)
+    stats_doc = stats_ref.get()
+
+    if not stats_doc.exists:
+        # Initialize stats
+        stats_ref.set({
+            "documents_uploaded": 0,
+            "conversations_created": 0,
+            "questions_asked": 0,
+            "ai_responses": 0,
+            "storage_used_bytes": 0,
+            "last_upload_date": None,
+            "created_at": datetime.now(),
+            "updated_at": datetime.now()
+        })
+
+    current_value = stats_doc.to_dict().get(request.stat, 0) if stats_doc.exists else 0
+    new_value = current_value + request.value
+
+    stats_ref.update({
+        request.stat: new_value,
+        "updated_at": datetime.now()
+    })
+
+    # Special handling for last_upload_date
+    if request.stat == "documents_uploaded":
+        stats_ref.update({"last_upload_date": datetime.now()})
+
+    return {
+        "status": "success",
+        "stat": request.stat,
+        "previous_value": current_value,
+        "new_value": new_value
+    }
+
 
 if __name__ == "__main__":
     import uvicorn

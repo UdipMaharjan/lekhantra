@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings | Lekhantra</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="profile.css">
+</head>
+<body class="profile-page-body">
+  <!-- Toast Notification -->
+  <div id="toast" class="toast"></div>
+
+  <!-- Header -->
+  <header class="settings-header">
+    <a href="/" class="settings-back">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="19" y1="12" x2="5" y2="12"></line>
+        <polyline points="12 19 5 12 12 5"></polyline>
+      </svg>
+      Back to Chat
+    </a>
+    <div class="settings-brand">
+      <img src="assets/logo.png" alt="Lekhantra" class="brand-logo">
+      <span class="brand-name">Lekhantra</span>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="settings-container">
+    <div class="settings-layout">
+
+      <!-- Left Sidebar -->
+      <aside class="settings-sidebar">
+        <div class="profile-card">
+          <div class="profile-avatar-wrapper">
+            <div class="profile-avatar-large" id="profileAvatar">
+              <img id="profileAvatarImg" alt="Profile">
+              <div class="avatar-placeholder" id="avatarPlaceholder">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+              </div>
+            </div>
+            <button class="avatar-upload-btn" id="uploadAvatarBtn" title="Change photo">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                <circle cx="12" cy="13" r="4"></circle>
+              </svg>
+            </button>
+          </div>
+
+          <h2 class="profile-name" id="profileName">Loading...</h2>
+          <p class="profile-email" id="profileEmail">Loading...</p>
+
+          <div class="profile-meta">
+            <div class="meta-item">
+              <span class="meta-label">Member since</span>
+              <span class="meta-value" id="memberSince">--</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Last login</span>
+              <span class="meta-value" id="lastLogin">--</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Provider</span>
+              <span class="meta-value" id="profileProvider">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="quick-stats">
+          <div class="quick-stat">
+            <span class="quick-stat-value" id="quickDocs">0</span>
+            <span class="quick-stat-label">Documents</span>
+          </div>
+          <div class="quick-stat">
+            <span class="quick-stat-value" id="quickChats">0</span>
+            <span class="quick-stat-label">Chats</span>
+          </div>
+          <div class="quick-stat">
+            <span class="quick-stat-value" id="quickQuestions">0</span>
+            <span class="quick-stat-label">Questions</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <div class="settings-main">
+
+        <!-- Account Section -->
+        <section class="settings-section">
+          <div class="section-header">
+            <h3>Account Information</h3>
+            <p>Manage your account details</p>
+          </div>
+          <div class="settings-card">
+            <div class="form-group">
+              <label for="displayName">Display Name</label>
+              <div class="input-with-action">
+                <input type="text" id="displayName" placeholder="Enter your name">
+                <button class="btn btn-primary btn-sm" id="saveNameBtn">Save</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="emailDisplay">Email Address</label>
+              <input type="email" id="emailDisplay" disabled>
+            </div>
+          </div>
+        </section>
+
+        <!-- Statistics Section -->
+        <section class="settings-section">
+          <div class="section-header">
+            <h3>Usage Statistics</h3>
+            <p>Your activity at a glance</p>
+          </div>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon documents">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+              </div>
+              <div class="stat-content">
+                <span class="stat-value" id="statDocuments">0</span>
+                <span class="stat-label">Documents Uploaded</span>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon conversations">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+              </div>
+              <div class="stat-content">
+                <span class="stat-value" id="statConversations">0</span>
+                <span class="stat-label">Conversations Created</span>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon questions">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+              </div>
+              <div class="stat-content">
+                <span class="stat-value" id="statQuestions">0</span>
+                <span class="stat-label">Questions Asked</span>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon responses">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                  <line x1="9" y1="9" x2="15" y2="9"></line>
+                </svg>
+              </div>
+              <div class="stat-content">
+                <span class="stat-value" id="statResponses">0</span>
+                <span class="stat-label">AI Responses</span>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon storage">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                </svg>
+              </div>
+              <div class="stat-content">
+                <span class="stat-value" id="statStorage">0 MB</span>
+                <span class="stat-label">Storage Used</span>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon upload">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="16" y1="2" x2="16" y2="6"></line>
+                  <line x1="8" y1="2" x2="8" y2="6"></line>
+                  <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+              </div>
+              <div class="stat-content">
+                <span class="stat-value" id="statLastUpload">Never</span>
+                <span class="stat-label">Last Upload</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Documents Section -->
+        <section class="settings-section">
+          <div class="section-header">
+            <h3>Uploaded Documents</h3>
+            <p>Manage your PDF documents</p>
+          </div>
+          <div class="documents-list" id="documentsList">
+            <div class="loading-state">
+              <div class="loading-spinner"></div>
+              <p>Loading documents...</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Preferences Section -->
+        <section class="settings-section">
+          <div class="section-header">
+            <h3>AI Preferences</h3>
+            <p>Customize your AI assistant experience</p>
+          </div>
+          <div class="settings-card">
+            <div class="preference-item">
+              <div class="preference-info">
+                <span class="preference-title">Response Style</span>
+                <span class="preference-desc">Choose how detailed AI responses should be</span>
+              </div>
+              <div class="preference-options">
+                <button class="option-btn" data-pref="response_style" data-value="concise">Concise</button>
+                <button class="option-btn active" data-pref="response_style" data-value="balanced">Balanced</button>
+                <button class="option-btn" data-pref="response_style" data-value="detailed">Detailed</button>
+              </div>
+            </div>
+
+            <div class="preference-item">
+              <div class="preference-info">
+                <span class="preference-title">Retrieval Depth</span>
+                <span class="preference-desc">Number of document chunks to search</span>
+              </div>
+              <div class="preference-options">
+                <button class="option-btn" data-pref="retrieval_depth" data-value="3">Top 3</button>
+                <button class="option-btn active" data-pref="retrieval_depth" data-value="5">Top 5</button>
+                <button class="option-btn" data-pref="retrieval_depth" data-value="10">Top 10</button>
+              </div>
+            </div>
+
+            <div class="preference-item">
+              <div class="preference-info">
+                <span class="preference-title">Show Source References</span>
+                <span class="preference-desc">Display page numbers in answers</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="showSourcesToggle" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- Privacy Section -->
+        <section class="settings-section">
+          <div class="section-header">
+            <h3>Data Management</h3>
+            <p>Export, backup, or delete your data</p>
+          </div>
+          <div class="settings-card">
+            <div class="action-item">
+              <div class="action-info">
+                <span class="action-title">Export Conversation History</span>
+                <span class="action-desc">Download all your conversations and messages as JSON</span>
+              </div>
+              <button class="btn btn-secondary" id="exportDataBtn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Export
+              </button>
+            </div>
+
+            <div class="action-item danger">
+              <div class="action-info">
+                <span class="action-title">Delete All Conversations</span>
+                <span class="action-desc">Permanently delete all chat history</span>
+              </div>
+              <button class="btn btn-danger-outline" id="deleteAllConversationsBtn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                Delete All
+              </button>
+            </div>
+
+            <div class="action-item danger">
+              <div class="action-info">
+                <span class="action-title">Delete All Documents</span>
+                <span class="action-desc">Remove all PDFs and embeddings from storage</span>
+              </div>
+              <button class="btn btn-danger-outline" id="deleteAllDocsBtn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                Delete All
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Danger Zone -->
+        <section class="settings-section danger-zone">
+          <div class="section-header">
+            <h3>Danger Zone</h3>
+            <p>Irreversible actions</p>
+          </div>
+          <div class="settings-card danger">
+            <div class="action-item danger critical">
+              <div class="action-info">
+                <span class="action-title">Delete Account</span>
+                <span class="action-desc">Permanently delete your account and all data</span>
+              </div>
+              <button class="btn btn-danger" id="deleteAccountBtn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                  <line x1="18" y1="8" x2="23" y2="13"></line>
+                  <line x1="23" y1="8" x2="18" y2="13"></line>
+                </svg>
+                Delete Account
+              </button>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Confirmation Modal -->
+  <div class="modal-overlay hidden" id="confirmModal">
+    <div class="confirm-modal">
+      <div class="confirm-icon" id="confirmIcon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+          <line x1="12" y1="9" x2="12" y2="13"></line>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+      </div>
+      <h3 id="confirmTitle">Are you sure?</h3>
+      <p id="confirmMessage">This action cannot be undone.</p>
+      <div class="confirm-actions">
+        <button class="btn btn-secondary" id="confirmCancel">Cancel</button>
+        <button class="btn btn-danger" id="confirmAction">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="firebase-auth.js"></script>
+  <script src="profile.js"></script>
+</body>
+</html>
