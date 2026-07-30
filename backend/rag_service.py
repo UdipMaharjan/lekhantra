@@ -2,14 +2,14 @@
 RAG Service - Retrieval-Augmented Generation pipeline
 """
 
-import os
+import gc
 import uuid
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 
-from embedding_service import generate_embedding, generate_embeddings
+from embedding_service import generate_embedding
 from vector_store import (
-    add_document_chunks,
+    add_document_chunk,
     similarity_search,
     check_document_exists,
     compute_file_hash,
@@ -59,6 +59,7 @@ def process_and_index_document(
         Dictionary with processing results
     """
     document_id = str(uuid.uuid4())
+    stored_chunks = False
 
     try:
         # Compute file hash for duplicate detection
@@ -78,37 +79,45 @@ def process_and_index_document(
 
         # Process PDF (extract text and create chunks)
         full_text, chunks = process_pdf(file_path)
-        print(f"[RAG] Processed {len(chunks)} chunks from PDF")
+        total_characters = len(full_text)
+        total_chunks = len(chunks)
+        del full_text
+        gc.collect()
+        print(f"[RAG] Processed {total_chunks} chunks from PDF")
 
-        # Generate embeddings for all chunks
-        chunk_texts = [chunk.text for chunk in chunks]
-        embeddings = generate_embeddings(chunk_texts, show_progress=True)
+        # Encode and write one chunk at a time.  This avoids retaining an
+        # embedding batch (and its Python list copies) for the whole document.
+        for storage_index, chunk in enumerate(chunks):
+            embedding = None
+            try:
+                embedding = generate_embedding(chunk.text)
+                if embedding is None:
+                    raise Exception("Failed to generate embedding")
 
-        if not embeddings or len(embeddings) != len(chunks):
-            raise Exception("Failed to generate embeddings for chunks")
+                if not add_document_chunk(
+                    document_id=document_id,
+                    user_id=user_id,
+                    filename=filename,
+                    text=chunk.text,
+                    page_number=chunk.page_number,
+                    chunk_index=chunk.chunk_index,
+                    storage_index=storage_index,
+                    embedding=embedding,
+                    file_hash=file_hash,
+                    total_chunks=total_chunks,
+                ):
+                    raise Exception("Failed to store document chunk")
+                stored_chunks = True
+            finally:
+                # ChromaDB has received the vector, so neither the NumPy array
+                # nor the processed chunk text needs to remain in this process.
+                if embedding is not None:
+                    del embedding
+                chunk.text = ""
+                gc.collect()
 
-        # Prepare chunk data for vector store
-        chunk_data = [
-            {
-                "text": chunk.text,
-                "page_number": chunk.page_number,
-                "chunk_index": chunk.chunk_index
-            }
-            for chunk in chunks
-        ]
-
-        # Add to vector store
-        success = add_document_chunks(
-            document_id=document_id,
-            user_id=user_id,
-            filename=filename,
-            chunks=chunk_data,
-            embeddings=embeddings,
-            file_hash=file_hash
-        )
-
-        if not success:
-            raise Exception("Failed to store document chunks")
+        del chunks
+        gc.collect()
 
         # Get page count
         page_count = get_page_count(file_path)
@@ -118,8 +127,8 @@ def process_and_index_document(
             "document_id": document_id,
             "filename": filename,
             "page_count": page_count,
-            "chunk_count": len(chunks),
-            "total_characters": len(full_text),
+            "chunk_count": total_chunks,
+            "total_characters": total_characters,
             "is_duplicate": False
         }
 
@@ -130,6 +139,8 @@ def process_and_index_document(
             "message": str(e)
         }
     except Exception as e:
+        if stored_chunks:
+            delete_document_chunks(document_id, user_id)
         print(f"[RAG] Error processing document: {e}")
         return {
             "status": "error",
@@ -163,18 +174,19 @@ def retrieve_relevant_chunks(
         print("[RAG] Failed to generate query embedding")
         return [], []
 
-    # Convert to list if numpy array
-    if hasattr(query_embedding, 'tolist'):
-        query_embedding = query_embedding.tolist()
-
-    # Perform similarity search
-    results = similarity_search(
-        query_embedding=query_embedding,
-        user_id=user_id,
-        top_k=top_k,
-        document_ids=document_ids,
-        min_similarity=MIN_SIMILARITY
-    )
+    try:
+        # ChromaDB accepts the NumPy vector directly, avoiding a second list
+        # allocation for every query.
+        results = similarity_search(
+            query_embedding=query_embedding,
+            user_id=user_id,
+            top_k=top_k,
+            document_ids=document_ids,
+            min_similarity=MIN_SIMILARITY
+        )
+    finally:
+        del query_embedding
+        gc.collect()
 
     # Build source references
     sources = []

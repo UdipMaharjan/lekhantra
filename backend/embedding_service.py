@@ -2,6 +2,7 @@
 Embedding Service - Generates embeddings using sentence-transformers/all-MiniLM-L6-v2
 """
 
+import gc
 from typing import Any, List, Optional
 
 # Model name as specified
@@ -43,14 +44,18 @@ def generate_embedding(text: str) -> Optional[Any]:
     """
     try:
         model = get_embedding_model()
-        embedding = model.encode(text, convert_to_numpy=True)
+        embedding = model.encode(
+            text,
+            convert_to_numpy=True,
+            show_progress_bar=False,
+        )
         return embedding
     except Exception as e:
         print(f"[EMBEDDING] Error generating embedding: {e}")
         return None
 
 
-def generate_embeddings(texts: List[str], show_progress: bool = True) -> List[Any]:
+def generate_embeddings(texts: List[str], show_progress: bool = False) -> List[Any]:
     """
     Generate embeddings for multiple texts.
 
@@ -65,13 +70,22 @@ def generate_embeddings(texts: List[str], show_progress: bool = True) -> List[An
         return []
 
     try:
+        # Kept for compatibility with existing callers; progress is always off
+        # to avoid retaining renderer state during uploads.
+        _ = show_progress
         model = get_embedding_model()
-        embeddings = model.encode(
-            texts,
-            convert_to_numpy=True,
-            show_progress_bar=show_progress
-        )
-        return embeddings.tolist() if hasattr(embeddings, 'tolist') else list(embeddings)
+        embeddings = []
+        for text in texts:
+            embedding = model.encode(
+                text,
+                convert_to_numpy=True,
+                show_progress_bar=False,
+            )
+            # Keep one embedding per item without creating a second list copy.
+            embeddings.append(embedding)
+            del embedding
+            gc.collect()
+        return embeddings
     except Exception as e:
         print(f"[EMBEDDING] Error generating embeddings: {e}")
         return []

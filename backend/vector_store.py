@@ -162,6 +162,41 @@ def add_document_chunks(
         return False
 
 
+def add_document_chunk(
+    document_id: str,
+    user_id: str,
+    filename: str,
+    text: str,
+    page_number: int,
+    chunk_index: int,
+    storage_index: int,
+    embedding: Any,
+    file_hash: str,
+    total_chunks: int,
+) -> bool:
+    """Store one chunk immediately to keep upload-time memory bounded."""
+    try:
+        collection = get_collection()
+        collection.add(
+            ids=[f"{document_id}_chunk_{storage_index}"],
+            embeddings=[embedding],
+            documents=[text],
+            metadatas=[{
+                "document_id": document_id,
+                "user_id": user_id,
+                "filename": filename,
+                "file_hash": file_hash,
+                "page_number": page_number,
+                "chunk_index": chunk_index,
+                "total_chunks": total_chunks,
+            }],
+        )
+        return True
+    except Exception as e:
+        print(f"[VECTOR STORE] Error adding document chunk: {e}")
+        return False
+
+
 def similarity_search(
     query_embedding: List[float],
     user_id: str,
