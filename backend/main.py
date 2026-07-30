@@ -3,13 +3,13 @@ Lekhantra Backend API
 AI Study Assistant for PDFs, Exams, and Viva
 
 Lazy imports: Heavy ML libraries (sentence-transformers, chromadb, fitz, openai,
-firebase-admin) are imported INSIDE route handlers, not at module level. This keeps
-startup fast so Render detects the open port within its 120s timeout before any ML
-models load. Initialization happens on first request, not at server start.
+firebase-admin) are deferred until the route or service function that needs them
+runs. This keeps startup fast so Render detects the open port within its 120s
+timeout before any ML models load. Initialization happens on first use, not at
+server start.
 """
 
 import os
-import shutil
 import uuid
 import traceback
 from pathlib import Path
@@ -33,7 +33,9 @@ print("  [1/6] FastAPI core loaded")
 # ============================================================
 # Constants
 # ============================================================
-UPLOAD_DIR = "uploads"
+BACKEND_DIR = Path(__file__).resolve().parent
+DATA_DIR = Path(os.getenv("LEKHANTRA_DATA_DIR", BACKEND_DIR))
+UPLOAD_DIR = str(DATA_DIR / "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 MAX_PDF_SIZE_MB = 5
 MAX_PDF_SIZE_BYTES = MAX_PDF_SIZE_MB * 1024 * 1024
@@ -76,7 +78,7 @@ CORS_ORIGINS = [
     "http://localhost",
     "http://127.0.0.1",
     "https://lekhantra.onrender.com",
-    "*"  # Allow all for development
+    "https://lekhantra-backend.onrender.com",
 ]
 
 app.add_middleware(
@@ -145,15 +147,6 @@ async def validation_exception_handler(request, exc):
             "details": exc.errors()
         }
     )
-
-UPLOAD_DIR = "uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-MAX_PDF_SIZE_MB = 5
-MAX_PDF_SIZE_BYTES = MAX_PDF_SIZE_MB * 1024 * 1024
-
-MAX_QUESTIONS = 10
-MAX_AI_TEXT_CHARS = 10000
-
 
 class ChatRequest(BaseModel):
     message: str
@@ -1030,6 +1023,8 @@ def calculate_real_stats(db, uid):
     """
     Calculate real statistics by querying actual data from Firestore.
     """
+    from vector_store import get_user_documents
+
     stats = {
         "documents_uploaded": 0,
         "conversations_created": 0,
@@ -1087,27 +1082,27 @@ def calculate_real_stats(db, uid):
 def get_profile(current_user: dict = Depends(_lazy_get_current_user())):
     """Get user profile information with real calculated statistics."""
     from auth_utils import get_firestore_client
-    from vector_store import get_user_documents
 
     db = get_firestore_client()
     uid = current_user.get("uid")
+
+    # Get preferences before composing the profile, since profile edits are
+    # stored there rather than in Firebase Auth.
+    prefs_doc = get_user_preferences_document(db, uid)
+    prefs_data = prefs_doc.to_dict()
 
     # Get user info from Firebase Auth (from token)
     profile_data = {
         "uid": uid,
         "email": current_user.get("email", ""),
-        "display_name": current_user.get("name", current_user.get("email", "").split("@")[0]),
-        "photo_url": current_user.get("picture", ""),
+        "display_name": prefs_data.get("display_name") or current_user.get("name", current_user.get("email", "").split("@")[0]),
+        "photo_url": prefs_data.get("photo_url") or current_user.get("picture", ""),
         "provider": current_user.get("provider", "email"),
         "email_verified": current_user.get("email_verified", False)
     }
 
     # Calculate real stats from actual data
     stats_data = calculate_real_stats(db, uid)
-
-    # Get preferences
-    prefs_doc = get_user_preferences_document(db, uid)
-    prefs_data = prefs_doc.to_dict()
 
     # Calculate storage MB
     storage_bytes = stats_data.get("storage_used_bytes", 0)
@@ -1151,8 +1146,6 @@ def update_profile(request: UpdateProfileRequest, current_user: dict = Depends(_
     # Note: Full profile updates require Firebase Admin SDK user management
     # For now, we store display preferences in Firestore
     prefs_ref = db.collection("user_preferences").document(uid)
-    prefs_doc = prefs_ref.get()
-
     update_data = {"updated_at": datetime.now()}
     if request.display_name is not None:
         update_data["display_name"] = request.display_name
@@ -1286,7 +1279,7 @@ def update_profile_preferences(request: UpdatePreferencesRequest, current_user: 
         update_data["show_sources"] = request.show_sources
 
     prefs_ref = db.collection("user_preferences").document(uid)
-    prefs_ref.update(update_data)
+    prefs_ref.set(update_data, merge=True)
 
     return {
         "status": "success",
@@ -1370,12 +1363,12 @@ def delete_all_conversations(current_user: dict = Depends(_lazy_get_current_user
 
     # Update stats
     stats_ref = db.collection("user_stats").document(uid)
-    stats_ref.update({
+    stats_ref.set({
         "conversations_created": 0,
         "questions_asked": 0,
         "ai_responses": 0,
         "updated_at": datetime.now()
-    })
+    }, merge=True)
 
     return {
         "status": "success",
@@ -1390,6 +1383,7 @@ def delete_all_documents(current_user: dict = Depends(_lazy_get_current_user()))
     from auth_utils import get_firestore_client
 
     user_id = current_user.get("uid")
+    db = get_firestore_client()
     documents = get_user_documents(user_id)
 
     deleted_count = 0
@@ -1401,14 +1395,13 @@ def delete_all_documents(current_user: dict = Depends(_lazy_get_current_user()))
                 deleted_count += 1
 
     # Update stats
-    # db already imported above
     stats_ref = db.collection("user_stats").document(user_id)
-    stats_ref.update({
+    stats_ref.set({
         "documents_uploaded": 0,
         "storage_used_bytes": 0,
         "last_upload_date": None,
         "updated_at": datetime.now()
-    })
+    }, merge=True)
 
     return {
         "status": "success",

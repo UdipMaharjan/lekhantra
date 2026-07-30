@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: lekhantra-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: uv sync
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    disk:
+      name: lekhantra-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: LEKHANTRA_DATA_DIR
+        value: /var/data
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false

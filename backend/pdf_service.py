@@ -6,8 +6,6 @@ import os
 import re
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
-import fitz  # PyMuPDF
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # Chunking configuration
 CHUNK_SIZE = 500  # characters
@@ -65,6 +63,9 @@ def extract_text_with_pages(file_path: str) -> List[ExtractedPage]:
     pages = []
 
     try:
+        # PyMuPDF is only required while reading an uploaded PDF.
+        import fitz
+
         pdf_document = fitz.open(file_path)
 
         if pdf_document.page_count == 0:
@@ -140,6 +141,9 @@ def split_into_chunks(
     Returns:
         List of Chunk objects with metadata
     """
+    # langchain's splitter is not needed for endpoints that do not process PDFs.
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+
     # Create text splitter with specified parameters
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
@@ -221,6 +225,8 @@ def get_page_count(file_path: str) -> int:
         Number of pages
     """
     try:
+        import fitz
+
         pdf_document = fitz.open(file_path)
         count = pdf_document.page_count
         pdf_document.close()

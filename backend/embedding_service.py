@@ -2,9 +2,7 @@
 Embedding Service - Generates embeddings using sentence-transformers/all-MiniLM-L6-v2
 """
 
-import numpy as np
-from typing import List, Optional
-from sentence_transformers import SentenceTransformer
+from typing import Any, List, Optional
 
 # Model name as specified
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
@@ -23,13 +21,17 @@ def get_embedding_model():
     """
     global _model
     if _model is None:
+        # Importing sentence-transformers also imports its ML runtime.  Keep that
+        # cost on the first embedding request instead of application startup.
+        from sentence_transformers import SentenceTransformer
+
         print(f"[EMBEDDING] Loading model: {EMBEDDING_MODEL_NAME}")
         _model = SentenceTransformer(EMBEDDING_MODEL_NAME)
         print(f"[EMBEDDING] Model loaded successfully")
     return _model
 
 
-def generate_embedding(text: str) -> Optional[np.ndarray]:
+def generate_embedding(text: str) -> Optional[Any]:
     """
     Generate embedding for a single text.
 
@@ -48,7 +50,7 @@ def generate_embedding(text: str) -> Optional[np.ndarray]:
         return None
 
 
-def generate_embeddings(texts: List[str], show_progress: bool = True) -> List[np.ndarray]:
+def generate_embeddings(texts: List[str], show_progress: bool = True) -> List[Any]:
     """
     Generate embeddings for multiple texts.
 

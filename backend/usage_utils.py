@@ -1,8 +1,6 @@
 from datetime import datetime, timezone
 from typing import Any
 
-from auth_utils import get_firestore_client
-
 # Map actions to stat increments
 ACTION_TO_STAT = {
     "upload_pdf": ("documents_uploaded", 1, "storage_used_bytes"),
@@ -37,6 +35,10 @@ def log_usage(
     """
 
     try:
+        # Importing auth_utils is intentionally deferred so usage logging does
+        # not load Firebase until a route invokes it.
+        from auth_utils import get_firestore_client
+
         db = get_firestore_client()
         uid = user.get("uid")
 

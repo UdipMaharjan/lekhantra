@@ -73,8 +73,10 @@ function showToast(message, type = 'success') {
 // ============================================================================
 async function checkAuth() {
   return new Promise((resolve) => {
-    if (typeof firebase !== 'undefined' && firebase.auth()) {
-      firebase.auth().onAuthStateChanged(async (user) => {
+    if (window.lekhantraAuth?.onAuthStateChanged) {
+      let unsubscribe = () => {};
+      unsubscribe = window.lekhantraAuth.onAuthStateChanged(async (user) => {
+        unsubscribe();
         if (user) {
           try {
             idToken = await user.getIdToken();

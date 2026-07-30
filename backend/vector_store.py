@@ -6,11 +6,12 @@ import os
 import hashlib
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
-import chromadb
-from chromadb.config import Settings
 
 # ChromaDB storage directory
-CHROMA_DB_DIR = os.path.join(os.path.dirname(__file__), "chroma_db")
+CHROMA_DB_DIR = os.path.join(
+    os.getenv("LEKHANTRA_DATA_DIR", os.path.dirname(__file__)),
+    "chroma_db",
+)
 
 # Collection name
 COLLECTION_NAME = "lekhantra_documents"
@@ -19,13 +20,30 @@ COLLECTION_NAME = "lekhantra_documents"
 _client = None
 
 
-def get_chroma_client() -> chromadb.PersistentClient:
+def _user_document_filter(user_id: str, document_id: Optional[str] = None) -> Dict[str, Any]:
+    """Build a Chroma-compatible metadata filter for a user's document."""
+    if document_id is None:
+        return {"user_id": user_id}
+    return {
+        "$and": [
+            {"user_id": user_id},
+            {"document_id": document_id},
+        ]
+    }
+
+
+def get_chroma_client() -> Any:
     """
     Get or create the ChromaDB persistent client.
     Stores data in backend/chroma_db/ directory.
     """
     global _client
     if _client is None:
+        # ChromaDB pulls in its database and ML dependencies.  Only load it when
+        # an endpoint actually needs the vector store.
+        import chromadb
+        from chromadb.config import Settings
+
         print(f"[VECTOR STORE] Initializing ChromaDB at: {CHROMA_DB_DIR}")
         os.makedirs(CHROMA_DB_DIR, exist_ok=True)
         _client = chromadb.PersistentClient(
@@ -168,9 +186,14 @@ def similarity_search(
         collection = get_collection()
 
         # Build where clause for filtering
-        where_clause = {"user_id": user_id}
+        where_clause: Dict[str, Any] = {"user_id": user_id}
         if document_ids:
-            where_clause["document_id"] = {"$in": document_ids}
+            where_clause = {
+                "$and": [
+                    {"user_id": user_id},
+                    {"document_id": {"$in": document_ids}},
+                ]
+            }
 
         # Query ChromaDB
         results = collection.query(
@@ -219,10 +242,7 @@ def get_document_chunks(document_id: str, user_id: str) -> List[Dict[str, Any]]:
     try:
         collection = get_collection()
         results = collection.get(
-            where={
-                "document_id": document_id,
-                "user_id": user_id
-            },
+            where=_user_document_filter(user_id, document_id),
             include=["documents", "metadatas"]
         )
 
@@ -255,10 +275,7 @@ def delete_document_chunks(document_id: str, user_id: str) -> bool:
     try:
         collection = get_collection()
         collection.delete(
-            where={
-                "document_id": document_id,
-                "user_id": user_id
-            }
+            where=_user_document_filter(user_id, document_id)
         )
         print(f"[VECTOR STORE] Deleted chunks for document: {document_id}")
         return True

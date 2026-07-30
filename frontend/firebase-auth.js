@@ -41,7 +41,8 @@ try {
 window.lekhantraAuth = {
   currentUser: null,
   idToken: null,
-  isAuthenticated: false
+  isAuthenticated: false,
+  onAuthStateChanged: (callback) => onAuthStateChanged(auth, callback)
 };
 
 // Helper functions
