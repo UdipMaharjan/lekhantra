@@ -1,71 +1,31 @@
-"""
-Lekhantra Backend API
-AI Study Assistant for PDFs, Exams, and Viva
-
-Lazy imports: Heavy ML libraries (sentence-transformers, chromadb, fitz, openai,
-firebase-admin) are imported INSIDE route handlers, not at module level. This keeps
-startup fast so Render detects the open port within its 120s timeout before any ML
-models load. Initialization happens on first request, not at server start.
-"""
-
 import os
 import shutil
 import uuid
 import traceback
 from pathlib import Path
-from datetime import datetime
-
-# FastAPI core — lightweight, loads in milliseconds
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Response, Request
+from pydantic import BaseModel, Field
+from question_utils import generate_viva_questions, generate_exam_questions
+from pdf_service import extract_text_from_pdf_legacy, PDFProcessingError
+from ai_utils import generate_ai_response
+from rag_service import process_and_index_document, generate_rag_answer, retrieve_relevant_chunks
+from vector_store import get_user_documents, delete_document_chunks, get_collection_stats
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from auth_utils import get_current_user, get_firestore_client
+from usage_utils import log_usage
+from datetime import datetime
+import uuid
 
-# ============================================================
-# STARTUP BANNER — shows immediately, before any heavy imports
-# ============================================================
-print("=" * 60)
-print("  Lekhantra Backend Starting...")
-print("=" * 60)
-print("  [1/6] FastAPI core loaded")
 
-# ============================================================
-# Constants
-# ============================================================
-UPLOAD_DIR = "uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-MAX_PDF_SIZE_MB = 5
-MAX_PDF_SIZE_BYTES = MAX_PDF_SIZE_MB * 1024 * 1024
-MAX_QUESTIONS = 10
-MAX_AI_TEXT_CHARS = 10000
-
-# ============================================================
-# Lazy Dependency Helpers
-# These import firebase-admin / sentence-transformers only when
-# a route that needs auth is actually called — not at startup.
-# ============================================================
-
-def _lazy_get_current_user():
-    """Wrapper so Depends() works with a lazy import inside."""
-    from auth_utils import get_current_user
-    return get_current_user
-
-def _lazy_get_firestore_client():
-    """Wrapper so Depends() works with a lazy import inside."""
-    from auth_utils import get_firestore_client
-    return get_firestore_client
-
-# ============================================================
-# FastAPI App
-# ============================================================
 app = FastAPI(
     title="Lekhantra API",
     description="AI Study Assistant for PDFs, Exams, and Viva",
     version="1.0.0"
 )
 
-# CORS configuration
+# CORS configuration - allow localhost and production origins
 CORS_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5500",
@@ -116,7 +76,7 @@ async def log_requests(request: Request, call_next):
         raise
 
 @app.get("/me")
-def get_me(current_user: dict = Depends(_lazy_get_current_user())):
+def get_me(current_user: dict = Depends(get_current_user)):
     return {
         "status": "success",
         "user": current_user
@@ -286,12 +246,7 @@ def chat(request: ChatRequest):
 
 
 @app.post("/upload-pdf")
-async def upload_pdf(file: UploadFile = File(...), current_user: dict = Depends(_lazy_get_current_user())):
-
-    # --- Lazy imports (heavy: rag_service triggers sentence-transformers + fitz) ---
-    from rag_service import process_and_index_document
-    from pdf_service import extract_text_from_pdf_legacy
-    from usage_utils import log_usage
+async def upload_pdf(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
     if not file.filename:
         raise HTTPException(
             status_code=400,
@@ -394,8 +349,6 @@ async def upload_pdf(file: UploadFile = File(...), current_user: dict = Depends(
 
 @app.post("/generate-viva")
 def generate_viva(request: QuestionRequest):
-    from question_utils import generate_viva_questions
-
     text_path = get_text_path(request.text_file)
 
     if not os.path.exists(text_path):
@@ -419,8 +372,6 @@ def generate_viva(request: QuestionRequest):
 
 @app.post("/generate-exam")
 def generate_exam(request: QuestionRequest):
-    from question_utils import generate_exam_questions
-
     text_path = get_text_path(request.text_file)
 
     if not os.path.exists(text_path):
@@ -442,10 +393,7 @@ def generate_exam(request: QuestionRequest):
     }
 
 @app.post("/ai-generate-viva")
-def ai_generate_viva(request: AIQuestionRequest, current_user: dict = Depends(_lazy_get_current_user())):
-    from ai_utils import generate_ai_response
-    from usage_utils import log_usage
-
+def ai_generate_viva(request: AIQuestionRequest, current_user: dict = Depends(get_current_user)):
     text_path = get_text_path(request.text_file)
 
     if not os.path.exists(text_path):
@@ -473,7 +421,7 @@ Study notes:
 """
 
     ai_output = generate_ai_response(prompt)
-
+    
     log_usage(
     current_user,
     "ai_generate_viva",
@@ -491,10 +439,7 @@ Study notes:
     }
 
 @app.post("/ai-generate-exam")
-def ai_generate_exam(request: AIQuestionRequest, current_user: dict = Depends(_lazy_get_current_user())):
-    from ai_utils import generate_ai_response
-    from usage_utils import log_usage
-
+def ai_generate_exam(request: AIQuestionRequest,  current_user: dict = Depends(get_current_user)):
     text_path = get_text_path(request.text_file)
 
     if not os.path.exists(text_path):
@@ -542,14 +487,11 @@ Study notes:
     }
 
 @app.post("/ask-pdf")
-def ask_pdf(request: AskPDFRequest, current_user: dict = Depends(_lazy_get_current_user())):
+def ask_pdf(request: AskPDFRequest, current_user: dict = Depends(get_current_user)):
     """
     Legacy endpoint for backward compatibility.
     Uses the old method of reading entire text file.
     """
-    from ai_utils import generate_ai_response
-    from usage_utils import log_usage
-
     text_path = get_text_path(request.text_file)
 
     if not os.path.exists(text_path):
@@ -599,14 +541,11 @@ User question:
 
 
 @app.post("/ask-rag")
-def ask_rag(request: AskRAGRequest, current_user: dict = Depends(_lazy_get_current_user())):
+def ask_rag(request: AskRAGRequest, current_user: dict = Depends(get_current_user)):
     """
     RAG-powered question answering endpoint.
     Uses semantic retrieval to find relevant chunks before generating answer.
     """
-    from rag_service import generate_rag_answer
-    from usage_utils import log_usage
-
     user_id = current_user.get("uid")
 
     if not request.question or not request.question.strip():
@@ -654,13 +593,12 @@ def ask_rag(request: AskRAGRequest, current_user: dict = Depends(_lazy_get_curre
 
 
 @app.get("/documents")
-def list_documents(current_user: dict = Depends(_lazy_get_current_user())):
+def list_documents(current_user: dict = Depends(get_current_user)):
     """
     List all indexed documents for the current user.
     """
-    from vector_store import get_user_documents
-
     user_id = current_user.get("uid")
+
     documents = get_user_documents(user_id)
 
     return {
@@ -670,14 +608,12 @@ def list_documents(current_user: dict = Depends(_lazy_get_current_user())):
 
 
 @app.delete("/documents/{document_id}")
-def delete_document_endpoint(document_id: str, current_user: dict = Depends(_lazy_get_current_user())):
+def delete_document_endpoint(document_id: str, current_user: dict = Depends(get_current_user)):
     """
     Delete a document and its embeddings from the vector store.
     """
-    from vector_store import delete_document_chunks
-    from usage_utils import log_usage
-
     user_id = current_user.get("uid")
+
     success = delete_document_chunks(document_id, user_id)
 
     if success:
@@ -698,13 +634,11 @@ def delete_document_endpoint(document_id: str, current_user: dict = Depends(_laz
 
 
 @app.get("/vector-stats")
-def get_vector_stats(current_user: dict = Depends(_lazy_get_current_user())):
+def get_vector_stats(current_user: dict = Depends(get_current_user)):
     """
     Get statistics about the vector store.
     Admin/debug endpoint.
     """
-    from vector_store import get_collection_stats
-
     stats = get_collection_stats()
     return {
         "status": "success",
@@ -713,9 +647,8 @@ def get_vector_stats(current_user: dict = Depends(_lazy_get_current_user())):
 
 
 @app.get("/conversations")
-def list_conversations(current_user: dict = Depends(_lazy_get_current_user())):
+def list_conversations(current_user: dict = Depends(get_current_user)):
     """List all conversations for the current user"""
-    from auth_utils import get_firestore_client
     db = get_firestore_client()
     uid = current_user.get("uid")
 
@@ -746,10 +679,9 @@ def list_conversations(current_user: dict = Depends(_lazy_get_current_user())):
 @app.post("/conversations")
 def create_conversation(
     request: CreateConversationRequest,
-    current_user: dict = Depends(_lazy_get_current_user())
+    current_user: dict = Depends(get_current_user)
 ):
     """Create a new conversation"""
-    from auth_utils import get_firestore_client
     print(f"[BACKEND] create_conversation called by user: {current_user.get('uid')}")
     print(f"[BACKEND] Request data: {request}")
 
@@ -781,9 +713,8 @@ def create_conversation(
 
 
 @app.get("/conversations/{conversation_id}")
-def get_conversation(conversation_id: str, current_user: dict = Depends(_lazy_get_current_user())):
+def get_conversation(conversation_id: str, current_user: dict = Depends(get_current_user)):
     """Get a specific conversation with its messages"""
-    from auth_utils import get_firestore_client
     print(f"[BACKEND] get_conversation called, ID: {conversation_id}")
     print(f"[BACKEND] User: {current_user.get('uid')}")
 
@@ -849,10 +780,9 @@ def get_conversation(conversation_id: str, current_user: dict = Depends(_lazy_ge
 def update_conversation(
     conversation_id: str,
     request: UpdateConversationRequest,
-    current_user: dict = Depends(_lazy_get_current_user())
+    current_user: dict = Depends(get_current_user)
 ):
     """Update a conversation (rename, delete)"""
-    from auth_utils import get_firestore_client
     db = get_firestore_client()
     uid = current_user.get("uid")
 
@@ -885,9 +815,8 @@ def update_conversation(
 
 
 @app.delete("/conversations/{conversation_id}")
-def delete_conversation(conversation_id: str, current_user: dict = Depends(_lazy_get_current_user())):
+def delete_conversation(conversation_id: str, current_user: dict = Depends(get_current_user)):
     """Soft delete a conversation"""
-    from auth_utils import get_firestore_client
     db = get_firestore_client()
     uid = current_user.get("uid")
 
@@ -918,10 +847,9 @@ def delete_conversation(conversation_id: str, current_user: dict = Depends(_lazy
 def add_message(
     conversation_id: str,
     request: AddMessageRequest,
-    current_user: dict = Depends(_lazy_get_current_user())
+    current_user: dict = Depends(get_current_user)
 ):
     """Add a message to a conversation"""
-    from auth_utils import get_firestore_client
     print(f"[BACKEND] add_message called")
     print(f"[BACKEND] conversation_id: {conversation_id}")
     print(f"[BACKEND] user: {current_user.get('uid')}")
@@ -974,8 +902,7 @@ def add_message(
 
 
 @app.get("/usage-logs")
-def get_usage_logs(current_user: dict = Depends(_lazy_get_current_user())):
-    from auth_utils import get_firestore_client
+def get_usage_logs(current_user: dict = Depends(get_current_user)):
     db = get_firestore_client()
 
     logs_ref = (
@@ -1084,11 +1011,8 @@ def calculate_real_stats(db, uid):
 
 
 @app.get("/profile")
-def get_profile(current_user: dict = Depends(_lazy_get_current_user())):
+def get_profile(current_user: dict = Depends(get_current_user)):
     """Get user profile information with real calculated statistics."""
-    from auth_utils import get_firestore_client
-    from vector_store import get_user_documents
-
     db = get_firestore_client()
     uid = current_user.get("uid")
 
@@ -1142,9 +1066,8 @@ def get_profile(current_user: dict = Depends(_lazy_get_current_user())):
 
 
 @app.put("/profile")
-def update_profile(request: UpdateProfileRequest, current_user: dict = Depends(_lazy_get_current_user())):
+def update_profile(request: UpdateProfileRequest, current_user: dict = Depends(get_current_user)):
     """Update user profile (display name, photo URL)."""
-    from auth_utils import get_firestore_client
     db = get_firestore_client()
     uid = current_user.get("uid")
 
@@ -1168,11 +1091,11 @@ def update_profile(request: UpdateProfileRequest, current_user: dict = Depends(_
 
 
 @app.get("/profile/documents")
-def get_profile_documents(current_user: dict = Depends(_lazy_get_current_user())):
+def get_profile_documents(current_user: dict = Depends(get_current_user)):
     """Get all documents uploaded by the user."""
-    from vector_store import get_user_documents
-
     user_id = current_user.get("uid")
+
+    # Get documents from vector store
     documents = get_user_documents(user_id)
 
     return {
@@ -1182,15 +1105,15 @@ def get_profile_documents(current_user: dict = Depends(_lazy_get_current_user())
 
 
 @app.delete("/profile/documents/{document_id}")
-def delete_profile_document(document_id: str, current_user: dict = Depends(_lazy_get_current_user())):
+def delete_profile_document(document_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a document from user's library."""
-    from vector_store import delete_document_chunks
-    from auth_utils import get_firestore_client
-
     user_id = current_user.get("uid")
+
+    # Delete from vector store
     success = delete_document_chunks(document_id, user_id)
 
     if success:
+        # Update storage in user_stats
         db = get_firestore_client()
         stats_ref = db.collection("user_stats").document(user_id)
         stats_doc = stats_ref.get()
@@ -1215,15 +1138,15 @@ def delete_profile_document(document_id: str, current_user: dict = Depends(_lazy
 
 
 @app.post("/documents/{document_id}/reindex")
-def reindex_document(document_id: str, current_user: dict = Depends(_lazy_get_current_user())):
+def reindex_document(document_id: str, current_user: dict = Depends(get_current_user)):
     """
     Re-index a document by deleting and regenerating its embeddings.
     Note: This requires the original PDF file to be available.
     For now, we just confirm the document exists in ChromaDB.
     """
-    from vector_store import get_document_chunks
-
     user_id = current_user.get("uid")
+
+    # Check if document exists
     chunks = get_document_chunks(document_id, user_id)
 
     if not chunks:
@@ -1244,9 +1167,8 @@ def reindex_document(document_id: str, current_user: dict = Depends(_lazy_get_cu
 
 
 @app.get("/profile/preferences")
-def get_profile_preferences(current_user: dict = Depends(_lazy_get_current_user())):
+def get_profile_preferences(current_user: dict = Depends(get_current_user)):
     """Get user preferences."""
-    from auth_utils import get_firestore_client
     db = get_firestore_client()
     uid = current_user.get("uid")
 
@@ -1264,9 +1186,8 @@ def get_profile_preferences(current_user: dict = Depends(_lazy_get_current_user(
 
 
 @app.put("/profile/preferences")
-def update_profile_preferences(request: UpdatePreferencesRequest, current_user: dict = Depends(_lazy_get_current_user())):
+def update_profile_preferences(request: UpdatePreferencesRequest, current_user: dict = Depends(get_current_user)):
     """Update user preferences."""
-    from auth_utils import get_firestore_client
     db = get_firestore_client()
     uid = current_user.get("uid")
 
@@ -1295,9 +1216,8 @@ def update_profile_preferences(request: UpdatePreferencesRequest, current_user: 
 
 
 @app.get("/profile/export")
-def export_user_data(current_user: dict = Depends(_lazy_get_current_user())):
+def export_user_data(current_user: dict = Depends(get_current_user)):
     """Export all user data (conversations and messages)."""
-    from auth_utils import get_firestore_client
     db = get_firestore_client()
     uid = current_user.get("uid")
 
@@ -1330,9 +1250,8 @@ def export_user_data(current_user: dict = Depends(_lazy_get_current_user())):
         })
 
     # Get user stats
-    stats_ref = db.collection("user_stats").document(uid)
-    stats_doc = stats_ref.get()
-    stats_data = stats_doc.to_dict() if stats_doc.exists else {}
+    stats_doc = get_user_stats_document(db, uid)
+    stats_data = stats_doc.to_dict()
 
     return {
         "status": "success",
@@ -1351,9 +1270,8 @@ def export_user_data(current_user: dict = Depends(_lazy_get_current_user())):
 
 
 @app.delete("/profile/conversations")
-def delete_all_conversations(current_user: dict = Depends(_lazy_get_current_user())):
+def delete_all_conversations(current_user: dict = Depends(get_current_user)):
     """Delete all user conversations."""
-    from auth_utils import get_firestore_client
     db = get_firestore_client()
     uid = current_user.get("uid")
 
@@ -1384,12 +1302,11 @@ def delete_all_conversations(current_user: dict = Depends(_lazy_get_current_user
 
 
 @app.delete("/profile/documents")
-def delete_all_documents(current_user: dict = Depends(_lazy_get_current_user())):
+def delete_all_documents(current_user: dict = Depends(get_current_user)):
     """Delete all user documents."""
-    from vector_store import get_user_documents, delete_document_chunks
-    from auth_utils import get_firestore_client
-
     user_id = current_user.get("uid")
+
+    # Get all document IDs
     documents = get_user_documents(user_id)
 
     deleted_count = 0
@@ -1401,7 +1318,7 @@ def delete_all_documents(current_user: dict = Depends(_lazy_get_current_user()))
                 deleted_count += 1
 
     # Update stats
-    # db already imported above
+    db = get_firestore_client()
     stats_ref = db.collection("user_stats").document(user_id)
     stats_ref.update({
         "documents_uploaded": 0,
@@ -1425,12 +1342,11 @@ class IncrementStatRequest(BaseModel):
     value: int = 1
 
 @app.post("/stats/increment")
-def increment_stat(request: IncrementStatRequest, current_user: dict = Depends(_lazy_get_current_user())):
+def increment_stat(request: IncrementStatRequest, current_user: dict = Depends(get_current_user)):
     """
     Increment a user statistic.
     Called automatically by frontend after actions.
     """
-    from auth_utils import get_firestore_client
     db = get_firestore_client()
     uid = current_user.get("uid")
 
@@ -1484,9 +1400,10 @@ def increment_stat(request: IncrementStatRequest, current_user: dict = Depends(_
 if __name__ == "__main__":
     import uvicorn
 
-    print("  [5/6] Server ready — waiting for first request")
-    print("  [6/6] Heavy services (Firebase, ChromaDB, Embeddings) init on first use")
-    print("=" * 60)
-
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
+
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=port
+    )
