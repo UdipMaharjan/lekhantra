@@ -137,12 +137,13 @@ async function loginWithGoogle() {
     return;
   }
 
-  const authMessage = document.getElementById("authMessage");
+  const authMessage = document.getElementById("signInMessage") || document.getElementById("signUpMessage");
   if (authMessage) authMessage.textContent = "Opening Google sign-in...";
 
   try {
     await signInWithPopup(auth, googleProvider);
-    closeAuthModal();
+    closeSignInModal();
+    closeSignUpModal();
   } catch (error) {
     console.error("Google sign-in error:", error);
     if (authMessage) authMessage.textContent = getFriendlyError(error);
@@ -150,14 +151,16 @@ async function loginWithGoogle() {
 }
 
 async function signInWithEmail() {
+  console.log('[FIREBASE] signInWithEmail() called, firebaseReady:', firebaseReady);
+
   if (!firebaseReady || !auth) {
     alert("Authentication not initialized. Please refresh the page.");
     return;
   }
 
-  const emailInput = document.getElementById("authEmail");
-  const passwordInput = document.getElementById("authPassword");
-  const authMessage = document.getElementById("authMessage");
+  const emailInput = document.getElementById("signInEmail");
+  const passwordInput = document.getElementById("signInPassword");
+  const authMessage = document.getElementById("signInMessage");
 
   const email = emailInput?.value?.trim();
   const password = passwordInput?.value;
@@ -170,8 +173,10 @@ async function signInWithEmail() {
   if (authMessage) authMessage.textContent = "Signing in...";
 
   try {
+    console.log('[FIREBASE] Calling Firebase signInWithEmail...');
     await signInWithEmailAndPassword(auth, email, password);
-    closeAuthModal();
+    console.log('[FIREBASE] Sign in successful!');
+    closeSignInModal();
   } catch (error) {
     console.error("Email sign-in error:", error);
     if (authMessage) authMessage.textContent = getFriendlyError(error);
@@ -184,22 +189,52 @@ async function createAccountWithEmail() {
     return;
   }
 
-  const nameInput = document.getElementById("authFullName");
-  const emailInput = document.getElementById("authEmail");
-  const passwordInput = document.getElementById("authPassword");
-  const authMessage = document.getElementById("authMessage");
+  const fullNameInput = document.getElementById("signUpFullName");
+  const emailInput = document.getElementById("signUpEmail");
+  const passwordInput = document.getElementById("signUpPassword");
+  const confirmPasswordInput = document.getElementById("signUpConfirmPassword");
+  const authMessage = document.getElementById("signUpMessage");
 
-  const fullName = nameInput?.value?.trim();
+  const fullName = fullNameInput?.value?.trim();
   const email = emailInput?.value?.trim();
   const password = passwordInput?.value;
+  const confirmPassword = confirmPasswordInput?.value;
 
-  if (!fullName || !email || !password) {
-    if (authMessage) authMessage.textContent = "Please enter full name, email, and password.";
+  // Validate all fields
+  if (!fullName) {
+    if (authMessage) authMessage.textContent = "Please enter your full name.";
+    return;
+  }
+
+  if (!email) {
+    if (authMessage) authMessage.textContent = "Please enter your email address.";
+    return;
+  }
+
+  // Email validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    if (authMessage) authMessage.textContent = "Please enter a valid email address.";
+    return;
+  }
+
+  if (!password) {
+    if (authMessage) authMessage.textContent = "Please enter a password.";
     return;
   }
 
   if (password.length < 6) {
     if (authMessage) authMessage.textContent = "Password must be at least 6 characters.";
+    return;
+  }
+
+  if (!confirmPassword) {
+    if (authMessage) authMessage.textContent = "Please confirm your password.";
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    if (authMessage) authMessage.textContent = "Passwords do not match.";
     return;
   }
 
@@ -209,7 +244,8 @@ async function createAccountWithEmail() {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(userCredential.user, { displayName: fullName });
     await userCredential.user.reload();
-    closeAuthModal();
+    closeSignUpModal();
+    showToast(`Welcome, ${fullName}!`, 'success');
   } catch (error) {
     console.error("Account creation error:", error);
     if (authMessage) authMessage.textContent = getFriendlyError(error);
@@ -326,73 +362,156 @@ function fileToDataUrl(file) {
   });
 }
 
-function openAuthModal() {
-  const authModal = document.getElementById("authModal");
-  const authMessage = document.getElementById("authMessage");
-  if (authModal) {
-    authModal.classList.remove("hidden");
+// Sign In Modal Functions
+function openSignInModal() {
+  const signInModal = document.getElementById("signInModal");
+  const signInMessage = document.getElementById("signInMessage");
+  if (signInModal) {
+    signInModal.classList.remove("hidden");
   }
-  if (authMessage) authMessage.textContent = "";
-  setTimeout(() => document.getElementById("authEmail")?.focus(), 100);
+  if (signInMessage) signInMessage.textContent = "";
+  setTimeout(() => document.getElementById("signInEmail")?.focus(), 100);
+
+  // Close sign up modal if open
+  closeSignUpModal();
+}
+
+function closeSignInModal() {
+  const signInModal = document.getElementById("signInModal");
+  if (signInModal) {
+    signInModal.classList.add("hidden");
+  }
+}
+
+// Sign Up Modal Functions
+function openSignUpModal() {
+  const signUpModal = document.getElementById("signUpModal");
+  const signUpMessage = document.getElementById("signUpMessage");
+  if (signUpModal) {
+    signUpModal.classList.remove("hidden");
+  }
+  if (signUpMessage) signUpMessage.textContent = "";
+  setTimeout(() => document.getElementById("signUpFullName")?.focus(), 100);
+
+  // Close sign in modal if open
+  closeSignInModal();
+}
+
+function closeSignUpModal() {
+  const signUpModal = document.getElementById("signUpModal");
+  if (signUpModal) {
+    signUpModal.classList.add("hidden");
+  }
+}
+
+// Unified auth modal function (for backwards compatibility)
+function openAuthModal() {
+  openSignInModal();
 }
 
 function closeAuthModal() {
-  const authModal = document.getElementById("authModal");
-  if (authModal) {
-    authModal.classList.add("hidden");
-  }
+  closeSignInModal();
+  closeSignUpModal();
 }
 
 // Event listeners
 function setupEventListeners() {
-  // Open auth modal
+  // Open sign in modal
   const openAuthBtn = document.getElementById("openAuthBtn");
   if (openAuthBtn) {
-    openAuthBtn.addEventListener("click", openAuthModal);
+    openAuthBtn.addEventListener("click", openSignInModal);
   }
 
-  // Close auth modal
-  const authCloseBtn = document.getElementById("authCloseBtn");
-  if (authCloseBtn) {
-    authCloseBtn.addEventListener("click", closeAuthModal);
+  // Sign In Modal close
+  const signInCloseBtn = document.getElementById("signInCloseBtn");
+  if (signInCloseBtn) {
+    signInCloseBtn.addEventListener("click", closeSignInModal);
   }
 
-  // Close modal on backdrop click
-  const authModal = document.getElementById("authModal");
-  if (authModal) {
-    authModal.addEventListener("click", (event) => {
-      if (event.target === authModal) {
-        closeAuthModal();
+  // Sign Up Modal close
+  const signUpCloseBtn = document.getElementById("signUpCloseBtn");
+  if (signUpCloseBtn) {
+    signUpCloseBtn.addEventListener("click", closeSignUpModal);
+  }
+
+  // Close modals on backdrop click
+  const signInModal = document.getElementById("signInModal");
+  if (signInModal) {
+    signInModal.addEventListener("click", (event) => {
+      if (event.target === signInModal) {
+        closeSignInModal();
       }
     });
   }
 
-  // Google sign-in
-  const googleContinueBtn = document.getElementById("googleContinueBtn");
-  if (googleContinueBtn) {
-    googleContinueBtn.addEventListener("click", loginWithGoogle);
+  const signUpModal = document.getElementById("signUpModal");
+  if (signUpModal) {
+    signUpModal.addEventListener("click", (event) => {
+      if (event.target === signUpModal) {
+        closeSignUpModal();
+      }
+    });
   }
 
-  // Email sign-in
-  const emailSignInBtn = document.getElementById("emailSignInBtn");
-  if (emailSignInBtn) {
-    emailSignInBtn.addEventListener("click", signInWithEmail);
+  // Switch between modals
+  const switchToSignUp = document.getElementById("switchToSignUp");
+  if (switchToSignUp) {
+    switchToSignUp.addEventListener("click", openSignUpModal);
   }
 
-  // Create account
-  const emailCreateBtn = document.getElementById("emailCreateBtn");
-  if (emailCreateBtn) {
-    emailCreateBtn.addEventListener("click", createAccountWithEmail);
+  const switchToSignIn = document.getElementById("switchToSignIn");
+  if (switchToSignIn) {
+    switchToSignIn.addEventListener("click", openSignInModal);
   }
 
-  // Enter key for password
-  const authPassword = document.getElementById("authPassword");
-  if (authPassword) {
-    authPassword.addEventListener("keydown", (event) => {
+  // Sign In form submission
+  const signInBtn = document.getElementById("signInBtn");
+  console.log('[FIREBASE] signInBtn element:', signInBtn);
+  if (signInBtn) {
+    signInBtn.addEventListener("click", (e) => {
+      console.log('[FIREBASE] signInBtn clicked!');
+      signInWithEmail();
+    });
+  } else {
+    console.error('[FIREBASE] signInBtn NOT FOUND in DOM!');
+  }
+
+  // Enter key in sign in password
+  const signInPassword = document.getElementById("signInPassword");
+  if (signInPassword) {
+    signInPassword.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         signInWithEmail();
       }
     });
+  }
+
+  // Google Sign In
+  const googleSignInBtn = document.getElementById("googleSignInBtn");
+  if (googleSignInBtn) {
+    googleSignInBtn.addEventListener("click", loginWithGoogle);
+  }
+
+  // Create Account
+  const signUpBtn = document.getElementById("signUpBtn");
+  if (signUpBtn) {
+    signUpBtn.addEventListener("click", createAccountWithEmail);
+  }
+
+  // Enter key in sign up form
+  const signUpPassword = document.getElementById("signUpPassword");
+  if (signUpPassword) {
+    signUpPassword.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        createAccountWithEmail();
+      }
+    });
+  }
+
+  // Google Sign Up (same as Google Sign In)
+  const googleSignUpBtn = document.getElementById("googleSignUpBtn");
+  if (googleSignUpBtn) {
+    googleSignUpBtn.addEventListener("click", loginWithGoogle);
   }
 
   // Logout
@@ -425,10 +544,11 @@ function setupEventListeners() {
     });
   }
 
-  // Escape key to close modal
+  // Escape key to close modals
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
-      closeAuthModal();
+      closeSignInModal();
+      closeSignUpModal();
     }
   });
 }
@@ -469,3 +589,9 @@ if (document.readyState === "loading") {
 // Expose functions globally for profile management
 window.updateUserProfile = updateUserProfile;
 window.changeUserPassword = changeUserPassword;
+window.openSignInModal = openSignInModal;
+window.closeSignInModal = closeSignInModal;
+window.openSignUpModal = openSignUpModal;
+window.closeSignUpModal = closeSignUpModal;
+window.signInWithEmail = signInWithEmail;
+window.createAccountWithEmail = createAccountWithEmail;

@@ -1694,19 +1694,22 @@ function initEventListeners() {
     elements.downloadOutputBtn.addEventListener('click', downloadOutput);
   }
 
-  // Auth modal
+  // Auth Modal (Sign In)
   const openAuthBtn = document.getElementById('openAuthBtn');
-  const authCloseBtn = document.getElementById('authCloseBtn');
+  const signInCloseBtn = document.getElementById('signInCloseBtn');
 
   if (openAuthBtn) {
-    openAuthBtn.addEventListener('click', openAuthModal);
+    openAuthBtn.addEventListener('click', openSignInModal);
   }
-  if (authCloseBtn) {
-    authCloseBtn.addEventListener('click', closeAuthModal);
+  if (signInCloseBtn) {
+    signInCloseBtn.addEventListener('click', closeSignInModal);
   }
-  if (elements.authModal) {
-    elements.authModal.addEventListener('click', (e) => {
-      if (e.target === elements.authModal) closeAuthModal();
+
+  // Sign In modal backdrop click
+  const signInModal = document.getElementById('signInModal');
+  if (signInModal) {
+    signInModal.addEventListener('click', (e) => {
+      if (e.target === signInModal) closeSignInModal();
     });
   }
 
@@ -1853,8 +1856,8 @@ function initKeyboardShortcuts() {
   document.addEventListener('keydown', (e) => {
     // Escape to close modals
     if (e.key === 'Escape') {
-      if (elements.authModal && !elements.authModal.classList.contains('hidden')) {
-        closeAuthModal();
+      if (signInModal && !signInModal.classList.contains('hidden')) {
+        closeSignInModal();
       }
       if (elements.generatorModal && !elements.generatorModal.classList.contains('hidden')) {
         elements.generatorModal.classList.add('hidden');
