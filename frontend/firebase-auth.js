@@ -584,10 +584,18 @@ function init() {
   onAuthStateChanged(auth, (user) => {
     console.log('[FIREBASE] Auth state changed:', user ? 'logged in' : 'logged out');
     updateAuthUI(user);
-    // Load conversations when user logs in
-    if (user && typeof loadConversations === 'function') {
-      console.log('[FIREBASE] Calling loadConversations after login');
-      loadConversations();
+
+    // Dispatch custom event for other scripts to listen to
+    window.dispatchEvent(new CustomEvent('authStateChange', {
+      detail: {
+        user: user,
+        isAuthenticated: !!user
+      }
+    }));
+
+    // Load conversations when user logs in (using custom event)
+    if (user) {
+      console.log('[FIREBASE] User logged in, dispatching authStateChange event');
     }
   });
 

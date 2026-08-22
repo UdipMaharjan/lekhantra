@@ -1890,6 +1890,15 @@ document.addEventListener('DOMContentLoaded', () => {
   initSuggestedPrompts();
   initProfileModal();
 
+  // Listen for auth state changes from firebase-auth.js
+  window.addEventListener('authStateChange', async (event) => {
+    console.log('[APP] Received authStateChange event', event.detail);
+    if (event.detail.isAuthenticated) {
+      console.log('[APP] User signed in, loading conversations...');
+      await loadConversations();
+    }
+  });
+
   // Set initial state
   if (elements.generateVivaBtn) elements.generateVivaBtn.disabled = true;
   if (elements.generateExamBtn) elements.generateExamBtn.disabled = true;
