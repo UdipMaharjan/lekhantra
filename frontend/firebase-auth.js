@@ -222,6 +222,9 @@ async function signOutUser() {
     await signOut(auth);
     const profileDropdown = document.getElementById("profileDropdown");
     if (profileDropdown) profileDropdown.classList.add("hidden");
+
+    // Refresh the page after sign out
+    window.location.reload();
   } catch (error) {
     console.error("Sign-out error:", error);
   }

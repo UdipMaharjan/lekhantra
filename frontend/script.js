@@ -1242,13 +1242,18 @@ function handlePhotoChange(event) {
 
   // Validate file type
   if (!file.type.startsWith('image/')) {
-    showToast('Please select an image file', 'error');
+    showToast('Please select an image file (JPG, PNG, GIF)', 'error');
     return;
   }
 
-  // Validate file size (max 5MB)
-  if (file.size > 5 * 1024 * 1024) {
-    showToast('Image size must be less than 5MB', 'error');
+  // Validate file size (max 100KB for Firebase - data URLs have length limits)
+  const maxSizeKB = 100;
+  const maxSizeBytes = maxSizeKB * 1024;
+
+  if (file.size > maxSizeBytes) {
+    showToast(`Image too large! Maximum size is ${maxSizeKB}KB. Please resize your image.`, 'error');
+    // Reset the file input
+    if (elements.photoInput) elements.photoInput.value = '';
     return;
   }
 
@@ -1298,12 +1303,26 @@ async function saveProfile() {
 
       showProfileSuccess('Profile updated successfully!');
       showToast('Profile saved!', 'success');
+
+      // Clear the photo file after successful upload
+      profilePhotoFile = null;
+      if (elements.photoInput) elements.photoInput.value = '';
     } else {
       throw new Error('Profile update function not available');
     }
   } catch (error) {
     console.error('Failed to update profile:', error);
-    showToast(error.message || 'Failed to update profile', 'error');
+
+    // Handle specific Firebase errors
+    let errorMessage = 'Failed to update profile';
+
+    if (error.message?.includes('Photo URL too long') || error.code === 'auth/invalid-profile-attribute') {
+      errorMessage = 'Photo is too large! Please use an image under 100KB.';
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+
+    showToast(errorMessage, 'error');
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -1386,7 +1405,20 @@ async function changePassword() {
     }
   } catch (error) {
     console.error('Failed to change password:', error);
-    showToast(error.message || 'Failed to change password', 'error');
+
+    let errorMessage = 'Failed to change password';
+
+    if (error.message?.includes('wrong-password')) {
+      errorMessage = 'Current password is incorrect';
+    } else if (error.message?.includes('requires-recent-login')) {
+      errorMessage = 'Please sign in again before changing password';
+    } else if (error.message?.includes('email/password accounts')) {
+      errorMessage = 'Password can only be changed for email accounts (not Google)';
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+
+    showToast(errorMessage, 'error');
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -1518,7 +1550,13 @@ function formatTimeAgo(date) {
 function profileSignOut() {
   closeProfileModal();
   if (typeof signOutUser === 'function') {
-    signOutUser();
+    signOutUser().then(() => {
+      // Refresh the page after sign out
+      window.location.reload();
+    });
+  } else {
+    // Fallback: just reload
+    window.location.reload();
   }
 }
 
