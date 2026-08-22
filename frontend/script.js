@@ -812,7 +812,9 @@ function getAuthHeaders() {
   if (!token) {
     console.error('[DEBUG] No auth token available');
     showToast('Please sign in first', 'error');
-    openAuthModal();
+    if (typeof window.openAuthModal === 'function') {
+      window.openAuthModal();
+    }
     return null;
   }
 

@@ -593,9 +593,10 @@ function init() {
       }
     }));
 
-    // Load conversations when user logs in (using custom event)
-    if (user) {
-      console.log('[FIREBASE] User logged in, dispatching authStateChange event');
+    // Also directly call loadConversations if available (handles case where event fires before listener is set up)
+    if (user && typeof loadConversations === 'function') {
+      console.log('[FIREBASE] Calling loadConversations directly');
+      loadConversations();
     }
   });
 
@@ -618,3 +619,5 @@ window.openSignUpModal = openSignUpModal;
 window.closeSignUpModal = closeSignUpModal;
 window.signInWithEmail = signInWithEmail;
 window.createAccountWithEmail = createAccountWithEmail;
+window.openAuthModal = openAuthModal;
+window.closeAuthModal = closeAuthModal;
