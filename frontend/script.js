@@ -19,6 +19,10 @@ let conversations = [];
 let currentConversationId = null;
 let pendingDeleteId = null;
 
+// Profile state
+let profilePhotoFile = null;
+let originalProfileData = {};
+
 // ============================================================================
 // DOM Elements
 // ============================================================================
@@ -81,6 +85,33 @@ const elements = {
   userGreeting: document.getElementById('userGreeting'),
   userAvatar: document.getElementById('userAvatar'),
   openAuthBtn: document.getElementById('openAuthBtn'),
+
+  // Profile Modal
+  profileModal: document.getElementById('profileModal'),
+  profileCloseBtn: document.getElementById('profileCloseBtn'),
+  profileAvatarImg: document.getElementById('profileAvatarImg'),
+  profileDisplayName: document.getElementById('profileDisplayName'),
+  profileEmail: document.getElementById('profileEmail'),
+  profileSubtitle: document.getElementById('profileSubtitle'),
+  accountType: document.getElementById('accountType'),
+  memberSince: document.getElementById('memberSince'),
+  changePhotoBtn: document.getElementById('changePhotoBtn'),
+  photoInput: document.getElementById('photoInput'),
+  saveProfileBtn: document.getElementById('saveProfileBtn'),
+  currentPassword: document.getElementById('currentPassword'),
+  newPassword: document.getElementById('newPassword'),
+  confirmPassword: document.getElementById('confirmPassword'),
+  changePasswordBtn: document.getElementById('changePasswordBtn'),
+  profileSignOutBtn: document.getElementById('profileSignOutBtn'),
+  profileSuccess: document.getElementById('profileSuccess'),
+  successMessage: document.getElementById('successMessage'),
+
+  // Usage Stats
+  pdfsUploaded: document.getElementById('pdfsUploaded'),
+  questionsAsked: document.getElementById('questionsAsked'),
+  conversationsCount: document.getElementById('conversationsCount'),
+  vivaGenerated: document.getElementById('vivaGenerated'),
+  activityList: document.getElementById('activityList'),
 };
 
 // ============================================================================
@@ -1120,6 +1151,465 @@ function closeAuthModal() {
 }
 
 // ============================================================================
+// Profile Modal
+// ============================================================================
+function openProfileModal() {
+  if (!window.lekhantraAuth?.isAuthenticated) {
+    showToast('Please sign in first', 'error');
+    openAuthModal();
+    return;
+  }
+
+  const user = window.lekhantraAuth.currentUser;
+
+  // Store original data
+  originalProfileData = {
+    displayName: user.displayName || '',
+    email: user.email || '',
+    photoURL: user.photoURL || ''
+  };
+
+  // Populate profile fields
+  if (elements.profileAvatarImg) {
+    elements.profileAvatarImg.src = user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(getFirstName(user))}&background=8B2252&color=fff&size=128`;
+  }
+  if (elements.profileDisplayName) {
+    elements.profileDisplayName.value = user.displayName || '';
+  }
+  if (elements.profileEmail) {
+    elements.profileEmail.value = user.email || '';
+  }
+  if (elements.profileSubtitle) {
+    elements.profileSubtitle.textContent = user.email || 'Update your personal information';
+  }
+
+  // Reset photo file
+  profilePhotoFile = null;
+
+  // Load usage stats
+  loadUsageStats();
+
+  // Show modal
+  if (elements.profileModal) {
+    elements.profileModal.classList.remove('hidden');
+  }
+
+  // Switch to profile tab
+  switchTab('profile');
+}
+
+function closeProfileModal() {
+  if (elements.profileModal) {
+    elements.profileModal.classList.add('hidden');
+  }
+
+  // Reset success message
+  if (elements.profileSuccess) {
+    elements.profileSuccess.classList.add('hidden');
+  }
+}
+
+function switchTab(tabName) {
+  // Update tab buttons
+  document.querySelectorAll('.profile-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.tab === tabName);
+  });
+
+  // Update tab content
+  document.querySelectorAll('.tab-content').forEach(content => {
+    content.classList.toggle('active', content.id === tabName + 'Tab');
+  });
+
+  // Load stats if switching to stats tab
+  if (tabName === 'stats') {
+    loadUsageStats();
+  }
+}
+
+// Tab switching
+function initProfileTabs() {
+  document.querySelectorAll('.profile-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      switchTab(tab.dataset.tab);
+    });
+  });
+}
+
+// Change photo
+function handlePhotoChange(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  // Validate file type
+  if (!file.type.startsWith('image/')) {
+    showToast('Please select an image file', 'error');
+    return;
+  }
+
+  // Validate file size (max 5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    showToast('Image size must be less than 5MB', 'error');
+    return;
+  }
+
+  profilePhotoFile = file;
+
+  // Preview the image
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    if (elements.profileAvatarImg) {
+      elements.profileAvatarImg.src = e.target.result;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+// Save profile
+async function saveProfile() {
+  const newName = elements.profileDisplayName?.value.trim();
+
+  if (!newName) {
+    showToast('Please enter a display name', 'error');
+    return;
+  }
+
+  const btn = elements.saveProfileBtn;
+  if (btn) {
+    btn.disabled = true;
+    btn.classList.add('loading');
+  }
+
+  try {
+    // Update Firebase profile
+    if (typeof window.updateUserProfile === 'function') {
+      await window.updateUserProfile(newName, profilePhotoFile);
+
+      // Update local state
+      window.lekhantraAuth.currentUser.displayName = newName;
+
+      // Update UI elements
+      const firstName = newName.split(' ')[0];
+      if (elements.userGreeting) {
+        elements.userGreeting.textContent = `Hey, ${firstName}`;
+      }
+      if (document.getElementById('dropdownName')) {
+        document.getElementById('dropdownName').textContent = newName;
+      }
+
+      showProfileSuccess('Profile updated successfully!');
+      showToast('Profile saved!', 'success');
+    } else {
+      throw new Error('Profile update function not available');
+    }
+  } catch (error) {
+    console.error('Failed to update profile:', error);
+    showToast(error.message || 'Failed to update profile', 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.classList.remove('loading');
+    }
+  }
+}
+
+function showProfileSuccess(message) {
+  if (elements.profileSuccess && elements.successMessage) {
+    elements.successMessage.textContent = message;
+    elements.profileSuccess.classList.remove('hidden');
+
+    setTimeout(() => {
+      elements.profileSuccess.classList.add('hidden');
+    }, 3000);
+  }
+}
+
+// Password requirements validation
+function validatePassword() {
+  const newPwd = elements.newPassword?.value || '';
+  const confirmPwd = elements.confirmPassword?.value || '';
+
+  const reqLength = document.getElementById('req-length');
+  const reqMatch = document.getElementById('req-match');
+
+  if (reqLength) {
+    reqLength.classList.toggle('valid', newPwd.length >= 6);
+  }
+
+  if (reqMatch) {
+    reqMatch.classList.toggle('valid', newPwd === confirmPwd && newPwd.length > 0);
+  }
+}
+
+// Change password
+async function changePassword() {
+  const currentPwd = elements.currentPassword?.value;
+  const newPwd = elements.newPassword?.value;
+  const confirmPwd = elements.confirmPassword?.value;
+
+  if (!currentPwd || !newPwd || !confirmPwd) {
+    showToast('Please fill in all password fields', 'error');
+    return;
+  }
+
+  if (newPwd.length < 6) {
+    showToast('Password must be at least 6 characters', 'error');
+    return;
+  }
+
+  if (newPwd !== confirmPwd) {
+    showToast('Passwords do not match', 'error');
+    return;
+  }
+
+  const btn = elements.changePasswordBtn;
+  if (btn) {
+    btn.disabled = true;
+    btn.classList.add('loading');
+  }
+
+  try {
+    if (typeof window.changeUserPassword === 'function') {
+      await window.changeUserPassword(currentPwd, newPwd);
+
+      // Clear password fields
+      if (elements.currentPassword) elements.currentPassword.value = '';
+      if (elements.newPassword) elements.newPassword.value = '';
+      if (elements.confirmPassword) elements.confirmPassword.value = '';
+
+      // Reset validation
+      validatePassword();
+
+      showProfileSuccess('Password updated successfully!');
+      showToast('Password changed!', 'success');
+    } else {
+      throw new Error('Password change function not available');
+    }
+  } catch (error) {
+    console.error('Failed to change password:', error);
+    showToast(error.message || 'Failed to change password', 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.classList.remove('loading');
+    }
+  }
+}
+
+// Load usage stats
+async function loadUsageStats() {
+  const authHeaders = getAuthHeaders();
+  if (!authHeaders) return;
+
+  // Reset stats
+  if (elements.pdfsUploaded) elements.pdfsUploaded.textContent = '0';
+  if (elements.questionsAsked) elements.questionsAsked.textContent = '0';
+  if (elements.conversationsCount) elements.conversationsCount.textContent = String(conversations.length);
+  if (elements.vivaGenerated) elements.vivaGenerated.textContent = '0';
+
+  try {
+    // Load usage logs
+    const response = await fetch(`${API_BASE_URL}/usage-logs`, {
+      method: 'GET',
+      headers: authHeaders
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+
+      if (data.status === 'success' && data.logs) {
+        // Count activity types
+        let pdfsCount = 0;
+        let questionsCount = 0;
+        let vivaCount = 0;
+        let examCount = 0;
+
+        data.logs.forEach(log => {
+          const action = log.action || '';
+          if (action.includes('upload_pdf')) pdfsCount++;
+          if (action.includes('ask_pdf')) questionsCount++;
+          if (action.includes('viva')) vivaCount++;
+          if (action.includes('exam')) examCount++;
+        });
+
+        if (elements.pdfsUploaded) elements.pdfsUploaded.textContent = String(pdfsCount);
+        if (elements.questionsAsked) elements.questionsAsked.textContent = String(questionsCount);
+        if (elements.vivaGenerated) elements.vivaGenerated.textContent = String(vivaCount);
+        if (elements.conversationsCount) elements.conversationsCount.textContent = String(conversations.length);
+
+        // Render activity list
+        renderActivityList(data.logs.slice(0, 10));
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load usage stats:', error);
+    if (elements.activityList) {
+      elements.activityList.innerHTML = `
+        <div class="activity-empty">
+          <p>Unable to load activity</p>
+        </div>
+      `;
+    }
+  }
+}
+
+function renderActivityList(logs) {
+  if (!elements.activityList) return;
+
+  if (!logs || logs.length === 0) {
+    elements.activityList.innerHTML = `
+      <div class="activity-empty">
+        <p>No recent activity</p>
+      </div>
+    `;
+    return;
+  }
+
+  const activityIcons = {
+    'upload_pdf': '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline>',
+    'ask_pdf': '<circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line>',
+    'ai_generate_viva': '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>',
+    'ai_generate_exam': '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>'
+  };
+
+  const activityLabels = {
+    'upload_pdf': 'Uploaded a PDF',
+    'ask_pdf': 'Asked a question',
+    'ai_generate_viva': 'Generated Viva questions',
+    'ai_generate_exam': 'Generated Exam questions'
+  };
+
+  elements.activityList.innerHTML = logs.map(log => {
+    const timestamp = log.timestamp ? new Date(log.timestamp) : new Date();
+    const timeAgo = formatTimeAgo(timestamp);
+    const icon = activityIcons[log.action] || activityIcons['ask_pdf'];
+    const label = activityLabels[log.action] || 'Activity';
+
+    return `
+      <div class="activity-item">
+        <div class="activity-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            ${icon}
+          </svg>
+        </div>
+        <div class="activity-info">
+          <span class="activity-title">${label}</span>
+          <span class="activity-time">${timeAgo}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function formatTimeAgo(date) {
+  const now = new Date();
+  const diff = now - date;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString();
+}
+
+// Profile sign out
+function profileSignOut() {
+  closeProfileModal();
+  if (typeof signOutUser === 'function') {
+    signOutUser();
+  }
+}
+
+// Toggle password visibility
+function initPasswordToggles() {
+  document.querySelectorAll('.password-toggle').forEach(toggle => {
+    toggle.addEventListener('click', () => {
+      const targetId = toggle.dataset.target;
+      const input = document.getElementById(targetId);
+      if (input) {
+        const isPassword = input.type === 'password';
+        input.type = isPassword ? 'text' : 'password';
+        toggle.innerHTML = isPassword
+          ? '<svg class="eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>'
+          : '<svg class="eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+      }
+    });
+  });
+}
+
+// Initialize profile modal
+function initProfileModal() {
+  initProfileTabs();
+  initPasswordToggles();
+
+  // Close button
+  if (elements.profileCloseBtn) {
+    elements.profileCloseBtn.addEventListener('click', closeProfileModal);
+  }
+
+  // Close on backdrop click
+  if (elements.profileModal) {
+    elements.profileModal.addEventListener('click', (e) => {
+      if (e.target === elements.profileModal) {
+        closeProfileModal();
+      }
+    });
+  }
+
+  // Change photo button
+  if (elements.changePhotoBtn && elements.photoInput) {
+    elements.changePhotoBtn.addEventListener('click', () => {
+      elements.photoInput.click();
+    });
+    elements.photoInput.addEventListener('change', handlePhotoChange);
+  }
+
+  // Save profile button
+  if (elements.saveProfileBtn) {
+    elements.saveProfileBtn.addEventListener('click', saveProfile);
+  }
+
+  // Password fields - validate on input
+  if (elements.newPassword) {
+    elements.newPassword.addEventListener('input', validatePassword);
+  }
+  if (elements.confirmPassword) {
+    elements.confirmPassword.addEventListener('input', validatePassword);
+  }
+
+  // Change password button
+  if (elements.changePasswordBtn) {
+    elements.changePasswordBtn.addEventListener('click', changePassword);
+  }
+
+  // Sign out button
+  if (elements.profileSignOutBtn) {
+    elements.profileSignOutBtn.addEventListener('click', profileSignOut);
+  }
+
+  // Enter key to save
+  if (elements.profileDisplayName) {
+    elements.profileDisplayName.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        saveProfile();
+      }
+    });
+  }
+}
+
+// Helper function
+function getFirstName(user) {
+  const displayName = user?.displayName || '';
+  if (displayName.trim()) {
+    return displayName.trim().split(' ')[0];
+  }
+  return user?.email?.split('@')[0] || 'User';
+}
+
+// ============================================================================
 // Event Listeners
 // ============================================================================
 function initEventListeners() {
@@ -1180,6 +1670,12 @@ function initEventListeners() {
     elements.authModal.addEventListener('click', (e) => {
       if (e.target === elements.authModal) closeAuthModal();
     });
+  }
+
+  // Profile modal
+  const manageProfileBtn = document.getElementById('manageProfileBtn');
+  if (manageProfileBtn) {
+    manageProfileBtn.addEventListener('click', openProfileModal);
   }
 
   // Generator modal close
@@ -1325,6 +1821,9 @@ function initKeyboardShortcuts() {
       if (elements.generatorModal && !elements.generatorModal.classList.contains('hidden')) {
         elements.generatorModal.classList.add('hidden');
       }
+      if (elements.profileModal && !elements.profileModal.classList.contains('hidden')) {
+        closeProfileModal();
+      }
       if (window.innerWidth <= 768 && elements.sidebar?.classList.contains('mobile-open')) {
         elements.sidebar.classList.remove('mobile-open');
       }
@@ -1348,6 +1847,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDragDrop();
   initKeyboardShortcuts();
   initSuggestedPrompts();
+  initProfileModal();
 
   // Set initial state
   if (elements.generateVivaBtn) elements.generateVivaBtn.disabled = true;
@@ -1364,3 +1864,5 @@ window.copyOutput = copyOutput;
 window.downloadOutput = downloadOutput;
 window.copyMessageContent = copyMessageContent;
 window.downloadMessageContent = downloadMessageContent;
+window.openProfileModal = openProfileModal;
+window.closeProfileModal = closeProfileModal;

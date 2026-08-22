@@ -7,7 +7,10 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  updateProfile
+  updateProfile,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 
 // Firebase Configuration
@@ -224,6 +227,102 @@ async function signOutUser() {
   }
 }
 
+// Update user profile (name and photo)
+async function updateUserProfile(displayName, photoFile) {
+  if (!firebaseReady || !auth) {
+    throw new Error("Authentication not initialized");
+  }
+
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error("No user logged in");
+  }
+
+  try {
+    const updates = {};
+
+    // Update display name
+    if (displayName) {
+      updates.displayName = displayName;
+    }
+
+    // Update photo URL if a new file was selected
+    if (photoFile) {
+      // For photo upload, we'd typically upload to Firebase Storage
+      // For now, we'll use a data URL approach for simplicity
+      updates.photoURL = await fileToDataUrl(photoFile);
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await updateProfile(user, updates);
+    }
+
+    // Refresh the user token
+    await user.reload();
+
+    // Update global auth state
+    window.lekhantraAuth.currentUser = {
+      uid: user.uid,
+      email: user.email,
+      displayName: user.displayName,
+      photoURL: user.photoURL
+    };
+
+    // Get fresh token
+    const token = await user.getIdToken();
+    window.lekhantraAuth.idToken = token;
+
+    return true;
+  } catch (error) {
+    console.error("Profile update error:", error);
+    throw error;
+  }
+}
+
+// Change user password
+async function changeUserPassword(currentPassword, newPassword) {
+  if (!firebaseReady || !auth) {
+    throw new Error("Authentication not initialized");
+  }
+
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error("No user logged in");
+  }
+
+  // Check if user signed in with email/password
+  if (user.providerData.length === 0 || user.providerData[0].providerId !== 'password') {
+    throw new Error("Password can only be changed for email/password accounts");
+  }
+
+  try {
+    // Re-authenticate user first
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+
+    // Update password
+    await updatePassword(user, newPassword);
+
+    return true;
+  } catch (error) {
+    console.error("Password change error:", error);
+    if (error.code === 'auth/wrong-password') {
+      throw new Error("Current password is incorrect");
+    }
+    throw error;
+  }
+}
+
+// Helper function to convert file to data URL
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 function openAuthModal() {
   const authModal = document.getElementById("authModal");
   const authMessage = document.getElementById("authMessage");
@@ -363,3 +462,7 @@ if (document.readyState === "loading") {
 } else {
   init();
 }
+
+// Expose functions globally for profile management
+window.updateUserProfile = updateUserProfile;
+window.changeUserPassword = changeUserPassword;
