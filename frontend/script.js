@@ -1126,21 +1126,6 @@ function clearOutput() {
   clearMessages();
 }
 
-function clearDocument() {
-  currentTextFile = null;
-  currentDocumentName = '';
-
-  if (elements.currentFileLabel) elements.currentFileLabel.textContent = 'No document selected';
-  if (elements.currentStatusLabel) elements.currentStatusLabel.textContent = 'Waiting';
-  if (elements.headerDocName) elements.headerDocName.textContent = 'No document loaded';
-  if (elements.currentDocument) elements.currentDocument.classList.add('hidden');
-  if (elements.generateVivaBtn) elements.generateVivaBtn.disabled = true;
-  if (elements.generateExamBtn) elements.generateExamBtn.disabled = true;
-
-  clearMessages();
-  showToast('Document cleared', 'info');
-}
-
 // ============================================================================
 // Auth Modal
 // ============================================================================
