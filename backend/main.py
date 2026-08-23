@@ -34,7 +34,6 @@ CORS_ORIGINS = [
     "http://localhost",
     "http://127.0.0.1",
     "https://lekhantra.onrender.com",
-    "*"  # Allow all for development
 ]
 
 app.add_middleware(

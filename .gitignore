@@ -12,7 +12,9 @@ venv/
 
 # Environment variables
 backend/.env
+backend/.env.docker
 .env
+.env.docker
 
 # Uploaded user files
 backend/uploads/
