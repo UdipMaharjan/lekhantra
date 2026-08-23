@@ -1677,12 +1677,16 @@ ul, ol {
   }
 
   .message-avatar {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
   }
 
-  .message-bubble {
-    padding: var(--space-3) var(--space-4);
+  .message-content {
+    max-width: 80%;
+  }
+
+  .message-text {
+    padding: var(--space-2) var(--space-3);
   }
 
   .modal {
@@ -2666,6 +2670,7 @@ ul, ol {
   display: flex;
   gap: var(--space-3);
   animation: fadeIn 0.3s ease;
+  width: 100%;
 }
 
 @keyframes fadeIn {
@@ -2681,16 +2686,18 @@ ul, ol {
 
 .message-ai {
   align-items: flex-start;
+  justify-content: flex-start;
 }
 
 .message-user {
-  flex-direction: row-reverse;
+  align-items: flex-end;
+  justify-content: flex-end;
 }
 
 .message-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-md);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   background: var(--color-primary-bg);
   display: flex;
   align-items: center;
@@ -2703,6 +2710,7 @@ ul, ol {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: 50%;
 }
 
 .message-avatar svg {
@@ -2714,15 +2722,21 @@ ul, ol {
 }
 
 .message-content {
+  display: flex;
+  flex-direction: column;
   max-width: 75%;
-  min-width: 100px;
+  min-width: 0;
 }
 
 .message-text {
-  padding: var(--space-4);
+  padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-lg);
   font-size: var(--text-base);
   line-height: var(--leading-relaxed);
+  width: fit-content;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .message-ai .message-text {
@@ -2734,6 +2748,7 @@ ul, ol {
 .message-user .message-text {
   background: var(--color-primary);
   color: white;
+  margin-left: auto;
 }
 
 .message-time {
@@ -2741,10 +2756,12 @@ ul, ol {
   color: var(--color-text-muted);
   margin-top: var(--space-1);
   padding: 0 var(--space-2);
+  width: fit-content;
 }
 
 .message-user .message-time {
   text-align: right;
+  margin-left: auto;
 }
 
 .message-actions {
