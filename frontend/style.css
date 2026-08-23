@@ -2568,7 +2568,8 @@ ul, ol {
   margin-left: 280px;
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - var(--header-height));
+  height: calc(100vh - var(--header-height));
+  overflow: hidden;
 }
 
 .chat-messages {
@@ -2576,6 +2577,7 @@ ul, ol {
   overflow-y: auto;
   padding: var(--space-6);
   padding-bottom: 140px;
+  min-height: 0; /* Required for flexbox scrolling */
 }
 
 /* Welcome State */
@@ -2686,8 +2688,8 @@ ul, ol {
 }
 
 .message-avatar {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-md);
   background: var(--color-primary-bg);
   display: flex;

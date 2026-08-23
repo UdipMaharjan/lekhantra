@@ -216,7 +216,7 @@ function showTypingIndicator() {
   `;
 
   elements.messagesContainer.appendChild(indicator);
-  scrollToBottom();
+  scrollToBottom(true);  // Force scroll to show typing indicator
 }
 
 function hideTypingIndicator() {
@@ -225,12 +225,39 @@ function hideTypingIndicator() {
 }
 
 // ============================================================================
-// Scroll to Bottom
+// Scroll Management - Smart scrolling with user position awareness
 // ============================================================================
-function scrollToBottom() {
-  if (elements.chatMessages) {
-    elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+const SCROLL_THRESHOLD = 100; // pixels from bottom to consider "near bottom"
+
+let userScrolledUp = false;
+
+function isNearBottom() {
+  if (!elements.chatMessages) return true;
+  const { scrollTop, scrollHeight, clientHeight } = elements.chatMessages;
+  return scrollHeight - scrollTop - clientHeight <= SCROLL_THRESHOLD;
+}
+
+function scrollToBottom(force = false) {
+  if (!elements.chatMessages) return;
+
+  const container = elements.chatMessages;
+  const targetScrollTop = container.scrollHeight - container.clientHeight;
+
+  // Only scroll if user is near bottom or forced
+  if (force || isNearBottom()) {
+    container.scrollTo({
+      top: targetScrollTop,
+      behavior: 'smooth'
+    });
   }
+}
+
+function initScrollTracking() {
+  if (!elements.chatMessages) return;
+
+  elements.chatMessages.addEventListener('scroll', () => {
+    userScrolledUp = !isNearBottom();
+  });
 }
 
 // ============================================================================
@@ -265,16 +292,30 @@ function addMessage(content, isUser = false, saveToHistory = true) {
   });
 
   if (isUser) {
+    // Get user's profile picture from Firebase auth state
+    const authUser = window.lekhantraAuth?.currentUser;
+    let userPhoto = null;
+
+    // Try to get photoURL from the current user
+    if (authUser?.photoURL) {
+      userPhoto = authUser.photoURL;
+    } else if (window.lekhantraAuth?.isAuthenticated) {
+      // Generate avatar from display name if authenticated but no photo
+      const displayName = authUser?.displayName || 'U';
+      userPhoto = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=8B2252&color=fff&size=64`;
+    }
+
+    const avatarHtml = userPhoto
+      ? `<img src="${userPhoto}" alt="User" onerror="this.src='https://ui-avatars.com/api/?name=U&background=8B2252&color=fff&size=64'">`
+      : '';
+
     messageDiv.innerHTML = `
       <div class="message-content">
         <div class="message-text">${escapeHtml(content)}</div>
         <div class="message-time">${time}</div>
       </div>
       <div class="message-avatar user-avatar">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-          <circle cx="12" cy="7" r="4"></circle>
-        </svg>
+        ${avatarHtml}
       </div>
     `;
   } else {
@@ -445,6 +486,9 @@ async function selectConversation(conversationId) {
           addMessage(msg.content, msg.role === 'user', false);  // Don't re-save
         });
       }
+
+      // Scroll to bottom after loading all messages
+      setTimeout(() => scrollToBottom(true), 100);
 
       // Set current document if available
       if (data.conversation.document_id) {
@@ -922,6 +966,9 @@ async function uploadPDF() {
       clearMessages();
       addMessage(`Document "${data.original_filename}" has been processed successfully. Extracted ${data.total_characters.toLocaleString()} characters. You can now ask questions or generate study materials.`, false);
 
+      // Scroll to show upload confirmation
+      setTimeout(() => scrollToBottom(true), 100);
+
       // Hide progress after delay
       setTimeout(() => {
         if (elements.uploadProgress) elements.uploadProgress.classList.add('hidden');
@@ -963,6 +1010,7 @@ async function askPDF() {
   initAutoResize();
 
   showTypingIndicator();
+  scrollToBottom(true);  // Force scroll after user message
 
   try {
     const response = await fetch(`${API_BASE_URL}/ask-pdf`, {
@@ -987,10 +1035,14 @@ async function askPDF() {
 
     addMessage(data.answer || 'I could not find an answer in the document.', false, true);  // Save AI response
 
+    // Force scroll after AI response
+    setTimeout(() => scrollToBottom(true), 50);
+
   } catch (error) {
     hideTypingIndicator();
     showToast(error.message || 'Failed to get answer', 'error');
     addMessage(`Error: ${error.message}`, false);
+    scrollToBottom(true);  // Scroll to show error message
   } finally {
     disableUI(false);
   }
@@ -1037,6 +1089,7 @@ async function generateViva() {
 
     addMessage(`📚 **Viva Questions** (${count} questions)\n\n${data.output || 'Questions generated successfully.'}`, false);
     showToast('Viva questions generated!', 'success');
+    scrollToBottom(true);  // Scroll to show generated questions
 
   } catch (error) {
     hideTypingIndicator();
@@ -1087,6 +1140,7 @@ async function generateExam() {
 
     addMessage(`📝 **Exam Questions** (${count} questions)\n\n${data.output || 'Questions generated successfully.'}`, false);
     showToast('Exam questions generated!', 'success');
+    scrollToBottom(true);  // Scroll to show generated questions
 
   } catch (error) {
     hideTypingIndicator();
@@ -1876,6 +1930,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initKeyboardShortcuts();
   initSuggestedPrompts();
   initProfileModal();
+  initScrollTracking();  // Initialize scroll position tracking
 
   // Listen for auth state changes from firebase-auth.js
   window.addEventListener('authStateChange', async (event) => {
